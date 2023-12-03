@@ -9,6 +9,7 @@ import numpy as np
 from spacestream.analyses.hvm_fitter import HvmFitter
 from spacestream.core.paths import HVM_PATH
 from spacestream.utils.general_utils import log
+from spacestream.utils.get_utils import get_mapping
 
 STREAM_IDX = {"Ventral": 5, "Lateral": 6, "Parietal": 7}
 
@@ -28,7 +29,6 @@ def main(
     sampling,
     var_splits,
 ):
-
     log(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     if model == "spacetorch_supervised":
@@ -43,50 +43,14 @@ def main(
     subj_name = "subj" + subj
 
     ## Retrieve mapping
-    # current defaults
-    space = "fsaverage"
-    algorithm = "hungarian"
-    if supervised:
-        corr_dir = (
-            Path(
-                "/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/NSD/results/spacetorch/"
-            )
-            / space
-            / "neighborhood/supervised"
-            / algorithm
-        )
-    else:
-        corr_dir = (
-            Path(
-                "/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/NSD/results/spacetorch/"
-            )
-            / space
-            / "neighborhood"
-            / algorithm
-        )
-    mapping_path = Path(
-        corr_dir
-        / (
-            "spatial_weight"
-            + str(spatial_weight)
-            + (("_seed" + str(model_seed)) if model_seed > 0 else "")
-        )
-        / subj_name
-        / (
-            hemi
-            + "_"
-            + roi
-            + "_CV_HVA_only_radius5.0_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_"
-            + "spherical_target_radius_factor1.0_"
-            + checkpoint
-            + "_unit2voxel_correlation_info.hdf5"
-        )
+    mapping = get_mapping(
+        subj_name=subj_name,
+        spatial_weight=spatial_weight,
+        model_seed=model_seed,
+        supervised=supervised,
+        hemi=hemi,
+        checkpoint=checkpoint,
     )
-    mapping = {}
-    with h5py.File(mapping_path, "r") as f:
-        keys = f.keys()
-        for k in keys:
-            mapping[k] = f[k][:]
 
     ## Get units for stream
     unit_idx = np.where(mapping["winning_roi"] == STREAM_IDX[stream])[0]

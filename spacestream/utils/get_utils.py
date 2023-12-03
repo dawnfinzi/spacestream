@@ -290,8 +290,12 @@ def get_mapping(
                 + (("_seed" + str(model_seed)) if model_seed > 0 else "")
             )
         )
+        mapping_stem = "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
     elif mapping_type == "voxel2voxel":
         corr_dir = RESULTS_PATH + "mappings/one_to_one/voxel2voxel/target_" + subj_name
+        mapping_stem = (
+            "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical"
+        )
 
     mapping_path = Path(
         corr_dir
@@ -306,7 +310,8 @@ def get_mapping(
             + "_"
             + roi
             + ("_CV" if mapping_type == "unit2voxel" else "")
-            + "_HVA_only_radius5.0_"
+            + "_HVA_only_radius"
+            + ("5.0_" if mapping_type == "unit2voxel" else "5_")
             + mapping_stem
             + (("_CV_seed" + str(model_seed)) if mapping_type == "voxel2voxel" else "")
             + "_"

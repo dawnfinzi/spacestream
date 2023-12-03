@@ -11,8 +11,8 @@ from scipy.stats import pearsonr
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import LinearSVC
-from spacestream.transfer.base_fitter import BaseFitter
 
+from spacestream.analyses.base_fitter import BaseFitter
 from spacestream.core.constants import RIDGE_CV_ALPHA_LONG, SVM_CV_C
 from spacestream.datasets.hvm import hvm_dataloader
 
@@ -26,7 +26,6 @@ class HvmFitter(BaseFitter):
         spatial_weight=0.5,
         model_seed=0,
     ):
-
         # Get HVM dataloader
         dataloader = hvm_dataloader(None, batch_size=128)
 

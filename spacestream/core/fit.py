@@ -1,11 +1,9 @@
 from datetime import datetime
 
-import h5py
 import numpy as np
 from sklearn.decomposition import PCA
 
 from spacestream.core.feature_extractor import get_features_from_layer
-from spacestream.core.paths import FEATS_PATH
 from spacestream.datasets.imagenet import imagenet_validation_dataloader
 from spacestream.datasets.nsd import nsd_dataloader
 from spacestream.utils.get_utils import get_model, get_model_layers

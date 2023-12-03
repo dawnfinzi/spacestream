@@ -23,10 +23,6 @@ def individual_calc(
     combo_type: str,  # options are unit2voxel or voxel2voxel
     hemi: str = "rh",
     roi: str = "ministreams",
-    algorithm: str = "lapjv",
-    space: str = "fsaverage",
-    radius: str = "5",
-    mapping_stem: str = "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical",
     checkpoint: str = "final",
     num_bins: int = 100,
     supervised: bool = False,
@@ -131,12 +127,6 @@ def main(
     if combo_type == "voxel2voxel":
         target_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
-
-        algorithm = "lapjv"
-        mapping_stem = (
-            "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical"
-        )
-        radius = "5"
     elif combo_type == "unit2voxel":
         target_list = [
             "0.0",
@@ -148,10 +138,6 @@ def main(
             "25.0",
         ]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
-
-        algorithm = "hungarian"
-        mapping_stem = "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
-        radius = "5.0"
 
     if aggregate:
         by_target_means = np.zeros((num_bins, len(target_list)))
@@ -197,9 +183,6 @@ def main(
                 target=target,
                 combo_type=combo_type,
                 hemi=hemi,
-                algorithm=algorithm,
-                radius=radius,
-                mapping_stem=mapping_stem,
                 checkpoint=checkpoint,
                 num_bins=num_bins,
                 supervised=(True if supervised else False),

@@ -11,7 +11,7 @@ from collections import defaultdict
 from sklearn.decomposition import PCA
 
 from spacestream.core.feature_extractor import get_features_from_layer
-from spacestream.core.paths import SPACETORCH_PATH
+from spacestream.core.paths import RESULTS_PATH
 from spacestream.utils.get_utils import get_model
 
 
@@ -26,7 +26,6 @@ class BaseFitter:
         train_frac=None,
         num_train_test_splits=10,
     ):
-
         self.train_frac = train_frac
         self.num_train_test_splits = num_train_test_splits
         self.dataloader = dataloader
@@ -36,7 +35,6 @@ class BaseFitter:
         self.model = get_model(model_name, trained, spatial_weight, model_seed)
 
     def get_features(self, layer_name, unit_idx=None):
-
         features = get_features_from_layer(
             self.model,
             self.dataloader,
@@ -230,8 +228,8 @@ class BaseFitter:
         sw = "sw" + str(spatial_weight)
 
         save_dir = os.path.join(
-            SPACETORCH_PATH,
-            "fsaverage/transfer",
+            RESULTS_PATH,
+            "analyses/transfer/HVM",
             f"{dataset_name}/{self.model_name}/{layer_name}/{sw}_seed{model_seed}/{subj}",
         )
         if not os.path.isdir(save_dir):
