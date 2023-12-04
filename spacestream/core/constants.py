@@ -85,17 +85,12 @@ ROI_NAMES = [
     "Lateral",
     "Parietal",
 ]
+CORE_ROI_NAMES = ["Ventral",
+    "Lateral",
+    "Dorsal"] #renaming Parietal to Dorsal for consistency with literature
 
 # Color palette for stream ROIs
-ROI_COLORS = {
-    "Early": "#a6a6a6",
-    "Midventral": "#f4bdd8",
-    "Midlateral": "#ccdaff",
-    "Midparietal": "#b3ffc6",
-    "Ventral": "#DC267F",
-    "Lateral": "#4d7fff",
-    "Parietal": "#006600",
-}
+ROI_COLORS = ["#006600","#00008b",'#990000'] #color palette is reversed ordered (Dorsal, Lateral, Ventral)
 
 # Pulled from Visual Cheese
 # SKLEARN TRANSFER CONSTANTS
