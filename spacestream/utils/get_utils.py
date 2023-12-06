@@ -308,9 +308,9 @@ def get_mapping(
             if mapping_type == "unit2voxel"
             else ("source_subj" + source_subj)
         )
-        + "/"
         + (
-            ("SWAPOPT_" if "MB" in model_type else "")
+            "/"
+            + ("SWAPOPT_" if "MB" in model_type else "")
             + hemi
             + "_"
             + roi
@@ -323,7 +323,7 @@ def get_mapping(
             + "_correlation_info.hdf5"
         )
     )
-    print(mapping_path)
+    
     mapping = {}
     with h5py.File(mapping_path, "r") as f:
         keys = f.keys()
