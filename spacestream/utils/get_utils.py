@@ -268,59 +268,62 @@ def get_mapping(
     checkpoint="final",
     source_subj="01",  # if voxel2voxel mapping
     roi="ministreams",
+    model_type="TDANN",  # options are "TDANN", "MB18" and "MB50"
 ):
-    # current defaults
-    mapping_stem = (
-        "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical"
-    )
-
-    # Retrieve mapping
-    if supervised:
-        stem = "supervised"
-    else:
-        stem = "self-supervised"
+    # setup (ugly but backwards compatible)
     if mapping_type == "unit2voxel":
-        corr_dir = (
-            RESULTS_PATH
-            + "mappings/one_to_one/unit2voxel/TDANNs/"
-            + stem
-            + (
-                "/spatial_weight"
+        if model_type == "TDANN":
+            sub_folder = (
+                ("/supervised"
+                if supervised
+                else "/self-supervised")
+                + "/spatial_weight"
                 + str(spatial_weight)
-                + (("_seed" + str(model_seed)) if model_seed > 0 else "")
+                + ("_seed" + str(model_seed) if model_seed > 0 else "")
             )
+            mapping_stem = "_CV_HVA_only_radius5.0_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
+            stem = (
+                "supervised" if supervised else "self-supervised"
+            )  # reassign to match MB structure
+        else:
+            sub_folder = "/RN" + ("18" if "18" in model_type else "50")
+            model_type = "MB"
+            mapping_stem = "_CV_HVA_only_matched_random_subsample_max_iters100"
+
+        corr_dir = (
+            RESULTS_PATH + "mappings/one_to_one/unit2voxel/" + model_type + "s" + sub_folder
         )
-        mapping_stem = "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
     elif mapping_type == "voxel2voxel":
         corr_dir = RESULTS_PATH + "mappings/one_to_one/voxel2voxel/target_" + subj_name
         mapping_stem = (
-            "max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical"
+            "_HVA_only_radius5_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical"
+            + "_CV_seed" + str(model_seed)
         )
 
-    mapping_path = Path(
+    mapping_path = (
         corr_dir
-        / (
+        + "/"
+        + (
             (subj_name)
             if mapping_type == "unit2voxel"
             else ("source_subj" + source_subj)
         )
-        / subj_name
-        / (
-            hemi
+        + "/"
+        + (
+            ("SWAPOPT_" if "MB" in model_type else "")
+            + hemi
             + "_"
             + roi
-            + ("_CV" if mapping_type == "unit2voxel" else "")
-            + "_HVA_only_radius"
-            + ("5.0_" if mapping_type == "unit2voxel" else "5_")
             + mapping_stem
-            + (("_CV_seed" + str(model_seed)) if mapping_type == "voxel2voxel" else "")
             + "_"
             + checkpoint
             + "_"
+            + ("functional_" if "MB" in model_type else "")
             + mapping_type
             + "_correlation_info.hdf5"
         )
     )
+    print(mapping_path)
     mapping = {}
     with h5py.File(mapping_path, "r") as f:
         keys = f.keys()
