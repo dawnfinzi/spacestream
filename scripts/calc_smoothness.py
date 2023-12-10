@@ -151,15 +151,11 @@ def main(
         if by_stream:
             rs = np.zeros((len(target_list), slen, 3))
             ps = np.zeros((len(target_list), slen, 3))
-            quarterdist_rs = np.zeros((len(target_list), slen, 3))
-            quarterdist_ps = np.zeros((len(target_list), slen, 3))
             thirddist_rs = np.zeros((len(target_list), slen, 3))
             thirddist_ps = np.zeros((len(target_list), slen, 3))
         else:
             rs = np.zeros((len(target_list), slen))
             ps = np.zeros((len(target_list), slen))
-            quarterdist_rs = np.zeros((len(target_list), slen))
-            quarterdist_ps = np.zeros((len(target_list), slen))
             thirddist_rs = np.zeros((len(target_list), slen))
             thirddist_ps = np.zeros((len(target_list), slen))
 
@@ -198,16 +194,12 @@ def main(
             else:
                 if calc_type == 1:
                     # cutoffs
-                    upto25 = np.where((d1 > 0.25) & (d1 < 0.26))[0][0]
                     upto33 = np.where((d1 > 0.33) & (d1 < 0.34))[0][0]
                     # calc correlations
-                    qr, qp = stats.pearsonr(d1[0:upto25], d2[0:upto25])
                     tr, tp = stats.pearsonr(d1[0:upto33], d2[0:upto33])
                     r, p = stats.pearsonr(d1, d2)
                     rs[t_sidx, s_sidx] = r
                     ps[t_sidx, s_sidx] = p
-                    quarterdist_rs[t_sidx, s_sidx] = qr
-                    quarterdist_ps[t_sidx, s_sidx] = qp
                     thirddist_rs[t_sidx, s_sidx] = tr
                     thirddist_ps[t_sidx, s_sidx] = tp
                 elif calc_type == 2:
@@ -238,22 +230,17 @@ def main(
                     else:
                         num_units = len(d1)
                         corrs = np.zeros(num_units)
-                        quarter_corrs = np.zeros(num_units)
                         third_corrs = np.zeros(num_units)
                         for i in range(num_units):
                             dists = d1[i, :]
                             vals = d2[i, :]
-                            upto25 = np.where((dists > 0.25) & (dists < 0.26))[0][0]
                             upto33 = np.where((dists > 0.33) & (dists < 0.34))[0][0]
                             # calc correlations
-                            qr, qp = stats.pearsonr(dists[0:upto25], vals[0:upto25])
                             tr, tp = stats.pearsonr(dists[0:upto33], vals[0:upto33])
                             r, p = stats.pearsonr(dists, vals)
                             corrs[i] = r
-                            quarter_corrs[i] = qr
                             third_corrs[i] = tr
                         rs[t_sidx, s_sidx] = np.mean(corrs)
-                        quarterdist_rs[t_sidx, s_sidx] = np.mean(quarter_corrs)
                         thirddist_rs[t_sidx, s_sidx] = np.mean(third_corrs)
 
         if aggregate:
@@ -266,7 +253,9 @@ def main(
     if calc_type == 0:
         save_path = (
             RESULTS_PATH
-            + "analyses/spatial/smoothness_calc_"
+            + "analyses/spatial/"
+            + ("brains" if combo_type == "voxel2voxel" else "TDANNs")
+            + "/smoothness_calc_"
             + ("lh_" if hemi == "lh" else "")
             + combo_type
             + ("_supervised" if supervised else "")
@@ -285,7 +274,9 @@ def main(
     else:  # correlations
         save_path = (
             RESULTS_PATH
-            + "analyses/spatial/smoothness_calc_"
+            + "analyses/spatial/"
+            + ("brains" if combo_type == "voxel2voxel" else "TDANNs")
+            + "/smoothness_calc_"
             + ("by_stream_" if by_stream else "")
             + ("lh_" if hemi == "lh" else "")
             + combo_type
@@ -301,9 +292,7 @@ def main(
         smoothness["r"] = rs
         smoothness["thirddist_r"] = thirddist_rs
         if calc_type == 1:
-            smoothness["quarterdist_r"] = quarterdist_rs
             smoothness["p"] = ps
-            smoothness["quarterdist_p"] = quarterdist_ps
             smoothness["thirddist_p"] = thirddist_ps
 
     dd.io.save(save_path, smoothness)
