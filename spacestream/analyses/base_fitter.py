@@ -223,14 +223,12 @@ class BaseFitter:
         sampling,
         var_splits,
     ):
-        dataset_name = self.dataloader.dataset.get_name()
-
         sw = "sw" + str(spatial_weight)
 
         save_dir = os.path.join(
             RESULTS_PATH,
             "analyses/transfer/HVM",
-            f"{dataset_name}/{self.model_name}/{layer_name}/{sw}_seed{model_seed}/{subj}",
+            f"{sw}_seed{model_seed}/{subj}",
         )
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)

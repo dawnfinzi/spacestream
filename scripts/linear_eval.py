@@ -17,7 +17,7 @@ from vissl.models.heads.linear_eval_mlp import LinearEvalMLP
 
 from spacestream.core.paths import RESULTS_PATH
 from spacestream.models.spatial_resnet import SpatialResNet18
-from spacestream.utils.get_utils import get_ckpts
+from spacestream.utils.get_utils import get_ckpts, get_mapping
 
 # constants
 STREAM_IDX = {"Ventral": 5, "Lateral": 6, "Parietal": 7}
@@ -137,38 +137,13 @@ def get_mask_unit_idx(
 ):
     # Retrieve mapping
     subj_name = "subj" + subj
-    if supervised:
-        stem = "supervised"
-    else:
-        stem = "self-supervised"
-    corr_dir = (
-        RESULTS_PATH
-        + "mappings/one_to_one/unit2voxel/TDANNs/"
-        + stem
-        + (
-            "/spatial_weight"
-            + str(spatial_weight)
-            + (("_seed" + str(model_seed)) if model_seed > 0 else "")
-        )
-    )
-    mapping_path = Path(
-        corr_dir
-        / subj_name
-        / (
-            hemi
-            + "_"
-            + roi
-            + "_CV_HVA_only_radius5.0_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_"
-            + "spherical_target_radius_factor1.0_"
-            + checkpoint
-            + "_unit2voxel_correlation_info.hdf5"
-        )
-    )
-    mapping = {}
-    with h5py.File(mapping_path, "r") as f:
-        keys = f.keys()
-        for k in keys:
-            mapping[k] = f[k][:]
+    mapping = get_mapping(subj_name=subj_name,
+                        spatial_weight=spatial_weight,
+                        model_seed=model_seed,
+                        supervised=supervised,
+                        hemi=hemi,
+                        roi=roi,
+                        checkpoint=checkpoint)
 
     # Get units for stream
     unit_idx = np.where(mapping["winning_roi"] == STREAM_IDX[stream])[0]
