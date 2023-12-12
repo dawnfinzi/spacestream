@@ -18,7 +18,7 @@ This repository has the following components:
 ## Getting started
 To install the repository, follow these steps:
 1. Create a virtual environment for this project (for example): `python3.7 -m venv spacestream_env`
-2. Activate the environment: `source spacestream/bin/activate`
+2. Activate the environment: `source spacestream_env/bin/activate`
 3. Clone the repository: `git clone https://github.com/dawnfinzi/spacestream.git`
 4. Change your working directory: `cd spacestream`
 5. Install the required packages: `pip install -e .`
