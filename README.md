@@ -1,9 +1,9 @@
-# A single computational objective drives specialization of streams in visual cortex
+# "A single computational objective drives specialization of streams in visual cortex"
 
 ## Authors
 * Dawn Finzi :email:
 * Eshed Margalit
-* Kendrick Kay
+* Kendrick Kay*
 * Daniel L. K. Yamins*
 * Kalanit Grill-Spector*
 
