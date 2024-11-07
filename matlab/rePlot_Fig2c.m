@@ -1,6 +1,4 @@
 %% replot figure 2c by ROI
-%dataDir='/Users/kalanit/Projects/Dawn/SpaceStreamPaper/NN/'
-%cd(dataDir)
 ROI={"Dorsal", "Lateral","Ventral"}
 
 %% read dataTables
@@ -208,9 +206,6 @@ axis([ 0 nmodels+1, 0  max(mean_noise+sd_noise)*1.1])
 set(gca,'Ycolor',[1 1 1])
 title('Ventral','FontSize',24,'FontName','Avenir')
 axis([ 0 nmodels+1, 0  max(mean_noise+sd_noise)*1.1])
-
-%add legend
-%legend('','','','lh','','','','','','','','rh','Box',"off",'Location','best','FontSize',18)
 
 %% savefig
 saveas(fig2c, 'Fig2c_1023.tif', 'tif');

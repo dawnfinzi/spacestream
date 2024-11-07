@@ -1,6 +1,4 @@
 %% replot figure 2b by ROI
-% dataDir='/Users/kalanit/Projects/Dawn/SpaceStreamPaper/NN/'
-% cd(dataDir)
 clear all
 close all
 ROI={"Dorsal", "Lateral","Ventral"}
@@ -96,10 +94,6 @@ model_names{4} = 'Supervised Categorization';
 %swap MB_50 and MB_18
 MB_50=find(model_names=="MB.RN18");
 MB_18=find(model_names=="MB.RN50");
-%%
-% model_names=erase(model_names,'RN18.')
-% model_names=erase(model_names,'RN50.')
-
 
 xvals=[1 2 3.3 4.3];
 xline1=[0.5:.1:2.5];xline2=[2.8:.1:4.8];
@@ -114,8 +108,8 @@ hold on;
 
 % label by stream predicted tasks
 model_names_dorsal=model_names;
-model_names_dorsal{MB_50}='Detection RN50'; %'detection (RN50)';
-model_names_dorsal{MB_18}='Detection RN18'; %detection (RN18)';
+model_names_dorsal{MB_50}='Detection RN50'; 
+model_names_dorsal{MB_18}='Detection RN18';
 
 % plot noise ceiling
 area ([0.1 nmodels+.8] ,[ mean_noise(1)+sd_noise(1), mean_noise(1)+sd_noise(1)],'Facecolor',[ .9 .9 .9],'EdgeColor',"none")
@@ -201,9 +195,6 @@ hold on
 area ([0.1 nmodels+.8] ,[ mean_noise(3)+sd_noise(3), mean_noise(3)+sd_noise(3)],'Facecolor',[ .9 .9 .9],'EdgeColor',"none")
 area ([0.1 nmodels+.8] ,[ mean_noise(3)-sd_noise(3), mean_noise(3)-sd_noise(3)],'Facecolor',[ 1 1 1],'EdgeColor',"none")
 
-% plot(0:1:8, (mean_noise(3)+sd_noise(3))*ones(1,length(0:1:8)),'k','Color', [ .8 .8 .8], 'LineWidth',2)
-% plot(0:1:8, (mean_noise(3)-sd_noise(3))*ones(1,length(0:1:8)),'k','Color', [ .8 .8 .8], 'LineWidth',2)
-% 
 % label by stream predicted tasks
 model_names_ventral=model_names;
 model_names_ventral{MB_50}='Categorization RN50'; %categorization RN50)';
@@ -237,9 +228,6 @@ axis([ 0 nmodels+1, 0  max(mean_noise+sd_noise)*1.1])
 set(gca,'Ycolor',[1 1 1])
 title('Ventral','FontSize',24,'FontName','Avenir')
 axis([ 0 nmodels+1, 0  max(mean_noise+sd_noise)*1.1])
-
-%add legend
-%legend('','','','lh','','','','','','','','rh','Box',"off",'Location','best')
 
 % savefig
 saveas(fig2b, 'Fig2b_1023.tif', 'tif')
