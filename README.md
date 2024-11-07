@@ -12,6 +12,7 @@
 ## Overview of the repository
 This repository has the following components:
 * `notebooks/`: Jupyter notebooks (saved as Markdown files) that reproduce all figures and statistics in the paper
+* `matlab/`: Matlab code used to generate a reorganized, revised version of Fig 2
 * `scripts/`: standalone scripts to be run from the command line. Includes example scripts to run the mapping algorithm (`fitting_one_to_one_unit2voxel.py` and `fitting_one_to_one_voxel2voxel.py` among others).
 * `spacestream/`: installable Python package with functionality including model feature extraction, model-to-brain mapping methods, task transfer, spatial and functional metrics of correspondence to the brain, and more.
 
