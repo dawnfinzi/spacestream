@@ -1,3 +1,6 @@
+"""
+
+"""
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -143,6 +146,7 @@ def main(
     base,
     spatial_weight,
     supervised,
+    location_type,
     max_iter,
     CV,
     model_seed,
@@ -178,21 +182,24 @@ def main(
         + "/subj"
         + subj
         + "/"
-        + ("SWAPOPT_" if model_type == "MBs" else "")
+        + ("SWAPOPT_" if model_type == "MBs" and location_type == 0 else "RANDOM_" if model_type == "MBs" and location_type == 1 else "")
         + hemi
         + "_"
         + roi
         + ("_CV" if CV else "")
         + "_HVA_only_"
         + suffix
+        + "TESTING"
     )
+
+    print(base_str_path)
 
     # Indexing
     beta_order, _, validation_mask = get_indices(subj)
 
     if model_type == "TDANNs":
         model_info = MODEL_INFO[model_type][base]
-        nsd_batches = 73  # num batches to use (low memory load)
+        nsd_batches = 73
         imgs_per_batch = 1000
     else:
         model_info = MODEL_INFO[model_type][str(base)]
@@ -325,11 +332,19 @@ def main(
             )
         task_idx = None
     else:
+        if location_type == 0:
+            # Default is the original, swapopt determined positions
+            loc_stem = "swapopt_swappedon_sine_gratings"
+        elif location_type == 1:
+            # Run a control where the positions are instead randomly determined
+            loc_stem = "random"
         coord_path = (
             DATA_PATH
             + "/models/MBs/RN"
             + str(base)
-            + "/swapopt_swappedon_sine_gratings.npz"
+            + "/"
+            + loc_stem
+            + ".npz"
         )
         chosen_save_path = (
             DATA_PATH + "/models/MBs/RN" + str(base) + "/chosen_indices.npz"
@@ -498,10 +513,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base", type=int, default=18
     )  # base architecture (resnet18 or resnet50)
-    parser.add_argument("--spatial_weight", type=float, default=1.25)
+    parser.add_argument("--spatial_weight", type=float, default=1.25) # (only relevant for TDANNs)
     parser.add_argument(
         "--supervised", type=int, default=0
     )  # supervised (1) or simCLR (0) objective (only relevant for TDANNs)
+    parser.add_argument(
+        "--location_type", type=int, default=0
+    )  # random control (1) or swapopt (0) determined position locations (only relevant for MBs)
     parser.add_argument("--max_iter", type=int, default=100)  # maximum iterations
     parser.add_argument(
         "--CV", type=int, default=0
@@ -517,6 +535,7 @@ if __name__ == "__main__":
         ARGS.base,
         ARGS.spatial_weight,
         ARGS.supervised,
+        ARGS.location_type,
         ARGS.max_iter,
         ARGS.CV,
         ARGS.model_seed,
