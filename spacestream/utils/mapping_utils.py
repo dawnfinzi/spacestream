@@ -247,3 +247,82 @@ def neighbors_choose_neighbors(
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
     return row_ind, col_ind
+
+def fast_neighbors_choose_neighbors(
+    ite,
+    cost_matrix,
+    row_ind,
+    col_ind,
+    source_distances,
+    source_radius,
+    target_distances,
+    target_radius,
+    gradient_info,
+    distance_cutoff,
+):
+    """
+    A more vectorized version of neighbors_choose_neighbors - uses NumPy array operations 
+    to gather neighbors in one shot and do fewer calls to np.unique().
+    """
+    # Pre-stack the negative gradients into one (N x 2) array so we can slice in one step
+    grad_xy = np.column_stack((-gradient_info["x"], -gradient_info["y"]))
+    
+    ncols = cost_matrix.shape[1]
+    # We'll iterate once per row in row_ind
+    for i in range(len(row_ind)):
+        actual_row = row_ind[i]
+        i_assignment = col_ind[i]
+
+        # 1) Find neighbors of this 'actual_row' in target_distances
+        i_dists = target_distances[actual_row, :]
+        i_neighbors = np.where((i_dists < target_radius) & (i_dists > 1e-8))[0]
+        if i_neighbors.size == 0:
+            # Edge unit, try with double radius
+            i_neighbors = np.where((i_dists < 2 * target_radius) & (i_dists > 1e-8))[0]
+
+        # 2) Among row_ind, find which are in i_neighbors
+        #    (np.intersect1d can be slower; np.isin + np.nonzero is often faster)
+        i_in_neighbors = np.isin(row_ind, i_neighbors)
+        i_neigh_row_inds = np.nonzero(i_in_neighbors)[0]  # Indices into row_ind
+        i_neighbor_assignments = col_ind[i_neigh_row_inds]
+
+        # 3) Gather neighbors from source_distances for *all* i_neighbor_assignments in one shot
+        #    Instead of looping and calling np.append repeatedly
+        #    shape: source_distances[i_neighbor_assignments] => (k, N)
+        #    We'll find columns that are < source_radius (and > 1e-8).
+        sdist_sub = source_distances[i_neighbor_assignments]  # shape (k, N)
+        mask_sub = (sdist_sub < source_radius) & (sdist_sub > 1e-8)
+        # mask_sub is shape (k, N). We want all columns 'colJ' where any row is True
+        # so we do np.where(mask_sub) => (rowJ, colJ).
+        # rowJ is index in i_neighbor_assignments, colJ is the "true" column index in [0..N).
+        rowJ, colJ = np.where(mask_sub)
+
+        # 4) Combine i_neighbor_assignments themselves + those columns
+        valid_source_vertices = np.concatenate([i_neighbor_assignments, colJ])
+        valid_source_vertices = np.unique(valid_source_vertices)
+
+        # 5) If first iteration, remove i_assignment from the set (no re-assigning to same spot)
+        if ite == 0:
+            valid_source_vertices = valid_source_vertices[valid_source_vertices != i_assignment]
+
+        # 6) Extract (x, y) for these valid vertices
+        pts = grad_xy[valid_source_vertices]
+
+        # 7) Fit GaussianMixture & compute mahalanobis distances
+        if pts.shape[0] > 0:
+            gm = GaussianMixture().fit(pts)
+            mahal_dists = mahalanobis(pts, gm.means_[0], gm.covariances_[0])
+            is_ok = mahal_dists < distance_cutoff
+            valid = valid_source_vertices[is_ok]
+
+            # 8) Mark everything else as cost=100
+            mask = np.ones(ncols, dtype=bool)
+            mask[valid] = False
+            cost_matrix[actual_row, mask] = 100
+        else:
+            # no valid vertices => do nothing
+            pass
+
+    # 9) Solve the assignment with the updated cost matrix
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+    return row_ind, col_ind

@@ -2,6 +2,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Union
+from tqdm import tqdm
 
 import h5py
 import numpy as np
@@ -140,21 +141,35 @@ def get_indices(subj: str, shared: bool = False):
 
     return beta_order, beta_mask, validation_mask
 
-
-def get_betas(subj, hemi, roi_info):
-    """Get betas for a given ROI, subject and hemi."""
+def get_betas(subj, hemi, roi_info, chunk_size=500):
+    """
+    Get betas (efficiently) for a given ROI, subject and hemi.
+    """
     beta_order, beta_mask, _ = get_indices(subj, shared=True)
     indx = beta_order.argsort(axis=0)
 
-    betas = betas = h5py.File(
-        BETA_PATH + "datab3fsaverage_subj" + subj + "_" + hemi + "_betas.hdf5",
-        "r",
-    )
+    roi_cols = np.nonzero(roi_info != 0)[0]
+    mask_rows = np.nonzero(beta_mask)[0]
 
-    stream_betas = betas["betas"][:, np.nonzero(roi_info != 0)[0]]
-    stream_betas = stream_betas[np.nonzero(beta_mask)[0], :]
+    with h5py.File(
+        BETA_PATH + f"datab3fsaverage_subj{subj}_{hemi}_betas.hdf5", "r"
+    ) as f:
+        betas_data = f["betas"]  # shape: [all_images, all_voxels]
+
+        # Allocate output array
+        n_rows = len(mask_rows)
+        n_cols = len(roi_cols)
+        stream_betas = np.empty((n_rows, n_cols), dtype=np.float32)
+
+        for i in tqdm(range(0, n_rows, chunk_size),
+                      desc="Loading betas in chunks",
+                      total=(n_rows // chunk_size + int(n_rows % chunk_size != 0))):
+            batch_idx = mask_rows[i : i + chunk_size]
+            # shape of betas_data[batch_idx] => (chunk_size, all_voxels)
+            # index columns by roi_cols => (chunk_size, n_cols)
+            stream_betas[i : i + chunk_size, :] = betas_data[batch_idx][:, roi_cols]
+
     sorted_betas = stream_betas[indx, :]
-
     return sorted_betas
 
 
