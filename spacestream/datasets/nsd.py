@@ -163,8 +163,9 @@ def nsd_dataloader(
         )
     elif model_name.lower() == "open_clip_RN50":
         _, _, transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
+    elif model_name.lower() == "convnext_tiny":
+        transform = torchvision.models.ConvNeXt_Tiny_Weights.DEFAULT.transforms()
     else:
-        transform_params = None
         transform = NSD_TRANSFORMS
 
     dataset = NSDataset(full_stim_path, video, transform, transform_params)

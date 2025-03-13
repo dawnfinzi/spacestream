@@ -306,6 +306,8 @@ def sine_dataloader(
         )
     elif model_name.lower() == "open_clip_RN50":
         _, _, transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
+    elif model_name.lower() == "convnext_tiny":
+        transform = torchvision.models.ConvNeXt_Tiny_Weights.DEFAULT.transforms()
     else:
         transform = DEFAULT_TRANSFORMS
 

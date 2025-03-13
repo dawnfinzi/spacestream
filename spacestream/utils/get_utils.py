@@ -238,6 +238,8 @@ def get_model(
         # Load OpenCLIP model (RN50 backbone)
         model, _, _ = open_clip.create_model_and_transforms('RN50', pretrained='openai')
         model = model.visual # vision encoder only
+    elif model_name == "convnext_tiny": # RN50 equivalent
+        model = models.convnext_tiny(weights='DEFAULT') # Imagenet1k_V1 weights
 
     return model
 
