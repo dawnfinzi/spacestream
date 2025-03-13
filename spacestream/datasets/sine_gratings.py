@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Type
 
 import numpy as np
+import open_clip
 import torch
 import torchvision
 import xarray as xr
@@ -278,6 +279,7 @@ def sine_dataloader(
     slowfast_alpha: int = 4,  # 4 for pretrained model, 8 for resnet18 version
 ) -> torch.utils.data.DataLoader:
 
+    transform_params = None
     if video:
         # Get transform parameters based on model
         transform_params = MODEL_TRANSFORM_PARAMS[model_name]
@@ -292,7 +294,6 @@ def sine_dataloader(
             transform_list.append(PackPathway(slowfast_alpha))
         transform = torchvision.transforms.Compose(transform_list)
     elif model_name.lower() == "ssd":
-        transform_params = None
         transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.ToPILImage(),
@@ -303,8 +304,9 @@ def sine_dataloader(
                 ),
             ]
         )
+    elif model_name.lower() == "open_clip_RN50":
+        _, _, transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
     else:
-        transform_params = None
         transform = DEFAULT_TRANSFORMS
 
     dataset = SineGrating2019(SINE_GRATING_PATH, video, transform, transform_params)

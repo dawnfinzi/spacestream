@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 import h5py
 import numpy as np
+import open_clip
 import pandas as pd
 import scipy.io
 import torch
@@ -233,11 +234,17 @@ def get_model(
         model = model.to(device)
         checkpointer = CheckPointer(model, save_dir=cfg.OUTPUT_DIR)
         checkpointer.load(ckpt, use_latest=ckpt is None)
+    elif model_name == "open_clip_RN50":
+        # Load OpenCLIP model (RN50 backbone)
+        model, _, _ = open_clip.create_model_and_transforms('RN50', pretrained='openai')
+        model = model.visual # vision encoder only
 
     return model
 
 
 def get_model_layers(model_name: str, model_layer_strings: Union[str, List[str]]):
+    # This utility function which gets the layer names for a given model is 
+    # currently only used for traditional linear mapping analysis (fit.py in core).
     if model_layer_strings is not None:
         if isinstance(model_layer_strings, str):
             if "," in model_layer_strings:

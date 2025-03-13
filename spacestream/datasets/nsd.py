@@ -2,6 +2,7 @@ from typing import Optional
 
 import h5py
 import numpy as np
+import open_clip
 import torch
 import torchvision
 from PIL import Image
@@ -127,6 +128,7 @@ def nsd_dataloader(
 ) -> torch.utils.data.DataLoader:
     full_stim_path = STIM_PATH + "nsd_stimuli.hdf5"
 
+    transform_params = None
     if video:
         # Get transform parameters based on model
         transform_params = MODEL_TRANSFORM_PARAMS[model_name]
@@ -143,7 +145,6 @@ def nsd_dataloader(
     elif model_name.lower() == "faster_rcnn":  # object detection trained on COCO
         # don't need a diff collate_fn to deal with different image sizes as nsd images have already been square cropped
         # and don't normalize by the imagenet norms & stds
-        transform_params = None
         transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.Resize(size=800, max_size=1333),
@@ -151,7 +152,6 @@ def nsd_dataloader(
             ]
         )
     elif model_name.lower() == "ssd":
-        transform_params = None
         transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.Resize(size=300),
@@ -161,6 +161,8 @@ def nsd_dataloader(
                 ),
             ]
         )
+    elif model_name.lower() == "open_clip_RN50":
+        _, _, transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
     else:
         transform_params = None
         transform = NSD_TRANSFORMS
