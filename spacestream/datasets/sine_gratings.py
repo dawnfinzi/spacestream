@@ -304,10 +304,26 @@ def sine_dataloader(
                 ),
             ]
         )
-    elif model_name.lower() == "open_clip_RN50":
+    elif model_name.lower() == "open_clip_rn50":
         _, _, transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
+        transform = torchvision.transforms.Compose([torchvision.transforms.ToPILImage()] + list(transform.transforms))
     elif model_name.lower() == "convnext_tiny":
-        transform = torchvision.models.ConvNeXt_Tiny_Weights.DEFAULT.transforms()
+        weights = torchvision.models.ConvNeXt_Tiny_Weights.DEFAULT
+        transform = torchvision.transforms.Compose([
+            torchvision.transforms.ToPILImage(),
+            torchvision.transforms.Resize(weights.transforms().resize_size, interpolation=weights.transforms().interpolation),
+            torchvision.transforms.CenterCrop(weights.transforms().crop_size),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(mean=weights.transforms().mean, std=weights.transforms().std),
+        ])
+    elif model_name.lower() == "detr_rn50":
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.ToPILImage(),
+                torchvision.transforms.Resize(size=800, max_size=1333),  # Resize shortest edge to 800, keep max at 1333
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Standard for DETR
+            ])
     else:
         transform = DEFAULT_TRANSFORMS
 

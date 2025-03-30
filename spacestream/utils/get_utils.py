@@ -11,6 +11,7 @@ import pandas as pd
 import scipy.io
 import torch
 import torchvision.models as models
+from transformers import DetrForObjectDetection
 from ssd.config import cfg
 from ssd.modeling.detector import build_detection_model
 from ssd.utils.checkpoint import CheckPointer
@@ -142,7 +143,7 @@ def get_indices(subj: str, shared: bool = False):
 
     return beta_order, beta_mask, validation_mask
 
-def get_betas(subj, hemi, roi_info, chunk_size=500):
+def get_betas(subj, hemi, roi_info, chunk_size=1000):
     """
     Get betas (efficiently) for a given ROI, subject and hemi.
     """
@@ -180,17 +181,17 @@ def get_model(
     spatial_weight: float = 1.25,
     model_seed: int = 0,
 ):
-    if model_name == "resnet18":
+    if model_name.lower() == "resnet18":
         model = models.resnet18(pretrained=pretrained)
-    elif model_name == "resnet50":
+    elif model_name.lower() == "resnet50":
         model = models.resnet50(pretrained=pretrained)
-    elif model_name == "resnet101":
+    elif model_name.lower() == "resnet101":
         model = models.resnet101(pretrained=pretrained)
-    elif model_name == "slowfast" or model_name == "slowfast_full":
+    elif model_name.lower() == "slowfast" or model_name.lower() == "slowfast_full":
         model = torch.hub.load(
             "facebookresearch/pytorchvideo", "slowfast_r50", pretrained=pretrained
         )
-    elif model_name == "slowfast18":
+    elif model_name.lower() == "slowfast18":
         fname = os.path.join(
             DATA_PATH, "models/MBs/RN18/slowfast/slow_fast_resnet18_kinetics.pt"
         )
@@ -202,11 +203,11 @@ def get_model(
             f2s_mul=2,
             fusion_stride=[8, 1, 1],
         )
-    elif model_name == "x3d_xs" or model_name == "x3d_s" or model_name == "x3d_m":
+    elif model_name.lower() == "x3d_xs" or model_name.lower() == "x3d_s" or model_name.lower() == "x3d_m":
         model = torch.hub.load(
             "facebookresearch/pytorchvideo", model_name, pretrained=pretrained
         )
-    elif model_name == "spacetorch" or model_name == "spacetorch_supervised":
+    elif model_name.lower() == "spacetorch" or model_name.lower() == "spacetorch_supervised":
         device = "cuda" if torch.cuda.is_available() else "cpu"
         if model_name == "spacetorch":
             supervised = False
@@ -218,9 +219,9 @@ def get_model(
         model = SpatialResNet18()
         if pretrained:
             model.load_state_dict(model_params, strict=False)
-    elif model_name == "faster_rcnn":
+    elif model_name.lower() == "faster_rcnn":
         model = models.detection.fasterrcnn_resnet50_fpn(pretrained=pretrained)
-    elif model_name == "ssd":
+    elif model_name.lower() == "ssd":
         config_file = (
             DATA_PATH
             + "models/MBs/RN18/SSD/configs/resnet18_ssd300_voc0712_nopre_300k_seed"
@@ -234,12 +235,14 @@ def get_model(
         model = model.to(device)
         checkpointer = CheckPointer(model, save_dir=cfg.OUTPUT_DIR)
         checkpointer.load(ckpt, use_latest=ckpt is None)
-    elif model_name == "open_clip_RN50":
+    elif model_name.lower() == "open_clip_rn50":
         # Load OpenCLIP model (RN50 backbone)
         model, _, _ = open_clip.create_model_and_transforms('RN50', pretrained='openai')
         model = model.visual # vision encoder only
-    elif model_name == "convnext_tiny": # RN50 equivalent
+    elif model_name.lower() == "convnext_tiny": # RN50 equivalent
         model = models.convnext_tiny(weights='DEFAULT') # Imagenet1k_V1 weights
+    elif model_name.lower() == "detr_rn50": # DETR trained with RN50 backbone
+        model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
 
     return model
 
@@ -292,7 +295,7 @@ def get_mapping(
     checkpoint="final",
     source_subj="01",  # if voxel2voxel mapping
     roi="ministreams",
-    model_type="TDANN",  # options are "TDANN", "MB18" and "MB50"
+    model_type="TDANN",  # options are "TDANN", "MB18", "MB50", and "MB50_v2"
 ):
     # setup (ugly but backwards compatible)
     if mapping_type == "unit2voxel":
@@ -310,7 +313,7 @@ def get_mapping(
                 "supervised" if supervised else "self-supervised"
             )  # reassign to match MB structure
         else:
-            sub_folder = "/RN" + ("18" if "18" in model_type else "50")
+            sub_folder = "/RN" + ("18" if "18" in model_type else "50_v2" if "50_v2" in model_type else "50")
             model_type = "MB"
             mapping_stem = "_CV_HVA_only_matched_random_subsample_max_iters100"
 

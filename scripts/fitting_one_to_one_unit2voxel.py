@@ -311,7 +311,6 @@ def main(
         del model[task]
         torch.cuda.empty_cache()
     
-    print("get brain info") #DEBUG
 
     # Get brain data
     # get ROI info
