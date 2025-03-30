@@ -4,6 +4,7 @@
 import argparse
 from datetime import datetime
 from pathlib import Path
+import gc
 
 import h5py
 import nibabel.freesurfer.mghformat as mgh
@@ -20,12 +21,11 @@ from spacestream.core.paths import DATA_PATH, RESULTS_PATH
 from spacestream.datasets.nsd import nsd_dataloader
 from spacestream.utils.general_utils import fast_pearson, log
 from spacestream.utils.get_utils import get_betas, get_indices, get_model
-from spacestream.utils.mapping_utils import (neighbors_choose_neighbors,
+from spacestream.utils.mapping_utils import (fast_neighbors_choose_neighbors,
                                              test_for_convergence)
 
 rng = default_rng()
 
-TASKS = {"MBs": ["categorization", "action", "detection"], "TDANNs": ["none"]}
 TASKS = {"MBs": ["categorization", "action", "detection"], "TDANNs": ["none"]}
 MODEL_INFO = {
     "MBs": {
@@ -41,6 +41,7 @@ MODEL_INFO = {
                 "detection": "ssd",
             },
             "slowfast_alpha": 8,
+            "tasks": ["categorization", "action", "detection"],
         },
         "50": {
             "layer_name": {
@@ -54,6 +55,21 @@ MODEL_INFO = {
                 "detection": "faster_rcnn",
             },
             "slowfast_alpha": 4,
+            "tasks": ["categorization", "action", "detection"]
+        },
+        "50_v2": {
+             "layer_name": {
+                "categorization": "features.7.1",
+                "clip": "layer4.1",
+                "detection": "model.backbone.conv_encoder.model.encoder.stages.3.layers.1" ,
+            },
+            "model_name": {
+                "categorization": "convnext_tiny",
+                "clip": "open_clip_rn50", 
+                "detection": "detr_rn50",
+            },
+            "slowfast_alpha": 4,  # placeholder
+            "tasks": ["categorization", "clip", "detection"]
         },
     },
     "TDANNs": {
@@ -61,11 +77,13 @@ MODEL_INFO = {
             "layer_name": {"none": "base_model.layer4.1"},
             "model_name": {"none": "spacetorch"},
             "slowfast_alpha": 4,  # placeholder
+            "tasks": ["none"],
         },
         "supervised": {
             "layer_name": {"none": "base_model.layer4.1"},
             "model_name": {"none": "spacetorch_supervised"},
             "slowfast_alpha": 4,  # placeholder
+            "tasks": ["none"],
         },
     },
 }
@@ -166,12 +184,12 @@ def main(
             + str(max_iter)
             + "_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
         )
-        assert base == 18, "ResNet50 base not available for TDANNs"
+        assert base == "18", "ResNet50 base not available for TDANNs"
         base = (
             "supervised" if supervised else "self-supervised"
         )  # reassign to match MB structure
     else:
-        sub_folder = "/RN" + str(base)
+        sub_folder = "/RN" + base
         suffix = "matched_random_subsample_max_iters" + str(max_iter)
 
     base_str_path = (
@@ -189,7 +207,6 @@ def main(
         + ("_CV" if CV else "")
         + "_HVA_only_"
         + suffix
-        + "TESTING"
     )
 
     print(base_str_path)
@@ -197,17 +214,17 @@ def main(
     # Indexing
     beta_order, _, validation_mask = get_indices(subj)
 
-    if model_type == "TDANNs":
-        model_info = MODEL_INFO[model_type][base]
+    model_info = MODEL_INFO[model_type][base]
+    task_info = model_info["tasks"]
+    if base == "50_v2":
+        nsd_batches = 146
+        imgs_per_batch = 500
+    else:
         nsd_batches = 73
         imgs_per_batch = 1000
-    else:
-        model_info = MODEL_INFO[model_type][str(base)]
-        nsd_batches = 365  # num batches to use (low memory load)
-        imgs_per_batch = 200
 
     model = {}
-    for task in TASKS[model_type]:
+    for task in task_info:
         model[task] = get_model(
             model_info["model_name"][task].lower(),
             pretrained=True,
@@ -215,16 +232,23 @@ def main(
             model_seed=model_seed,
         )
 
+    # Get indices for subsampling
+    chosen_indices = {}
+    if model_type == "MBs":
+        chosen_save_path = (
+            DATA_PATH + "/models/MBs/RN" + base + "/chosen_indices.npz"
+        )
+        for task in task_info:
+            chosen_indices[task] = np.load(chosen_save_path)[task]
+   
     # Get model features
     log("Getting features")
     final_features = {}
     subj_stim_idx = np.sort(beta_order)
-    prev_batch_end = dict(zip(TASKS[model_type], [0, 0, 0]))
-    for _, task in enumerate(TASKS[model_type]):
-        if task == "detection":
-            device = "cpu"
-        else:
-            device = "cuda"
+    prev_batch_end = dict(zip(task_info, [0, 0, 0]))
+    for _, task in enumerate(task_info):
+        print(task)
+        device = "cuda"
         for b in range(nsd_batches):
             log(b)
             subj_batch_idx = subj_stim_idx[
@@ -236,7 +260,7 @@ def main(
             video, two_pathway, reduction_list = False, False, None
             if task == "action":
                 video, two_pathway = True, True
-                if base == 50:
+                if base == "50":
                     reduction_list = [2]
 
             batch = nsd_dataloader(
@@ -257,28 +281,49 @@ def main(
                 vectorize=True,
                 device=device,
             )
+            del batch
 
             if b == 0:
-                feat_length = batch_feats[model_info["layer_name"][task]].shape[
-                    1
-                ]  # num feats
+                if model_type == "MBs":
+                    feat_length = len(chosen_indices[task])
+                else:
+                    feat_length = batch_feats[model_info["layer_name"][task]].shape[
+                        1
+                    ]  # num feats
 
                 # preallocate array
                 final_features[task] = np.zeros(
                     (subj_stim_idx.shape[0], feat_length), dtype=np.float32
                 )
 
+            if model_type == "TDANNS":
+                chosen_indices[task] = np.arange(feat_length)
             final_features[task][
                 prev_batch_end[task] : prev_batch_end[task] + batch_end, :
-            ] = batch_feats[model_info["layer_name"][task]]
+            ] = batch_feats[model_info["layer_name"][task]][:, chosen_indices[task]]
 
             prev_batch_end[task] += batch_end
             del batch_feats
+            torch.cuda.empty_cache()
 
+        print("end of batch loop for")
+        print(task)
         del model[task]
         torch.cuda.empty_cache()
+    
+    print("get brain info") #DEBUG
 
     # Get brain data
+    # get ROI info
+    mgh_file = mgh.load(DATA_PATH + "brains/" + hemi + "." + roi + ".mgz")
+    streams = mgh_file.get_fdata()[:, 0, 0].astype(int)
+    streams_trim = streams[streams != 0]
+    # get source betas
+    sorted_betas = get_betas(subj, hemi, streams, chunk_size=100)
+    ROI_idx = np.where((streams_trim == 5) | (streams_trim == 6) | (streams_trim == 7))[
+        0
+    ]
+    sorted_betas = sorted_betas[:, ROI_idx]
     # get voxel distance matrix
     dfile = DATA_PATH + "brains/ministreams_" + hemi + "_distances.mat"
     with h5py.File(dfile, "r") as f:
@@ -286,21 +331,7 @@ def main(
     radius_as_percent = RADIUS / np.nanmax(
         distances
     )  # get radius as percent of max distance to do conversion for model distances
-
-    # get ROI info
-    mgh_file = mgh.load(DATA_PATH + "brains/" + hemi + "." + roi + ".mgz")
-    streams = mgh_file.get_fdata()[:, 0, 0].astype(int)
-    streams_trim = streams[streams != 0]
-
-    # get source betas
-    sorted_betas = get_betas(subj, hemi, streams)
-
-    ROI_idx = np.where((streams_trim == 5) | (streams_trim == 6) | (streams_trim == 7))[
-        0
-    ]
-    sorted_betas = sorted_betas[:, ROI_idx]
     distances = distances[np.ix_(ROI_idx, ROI_idx)]
-
     # get physical location info
     gradient_info = {}
     axes = ["x", "y"]
@@ -337,27 +368,20 @@ def main(
             loc_stem = "swapopt_swappedon_sine_gratings"
         elif location_type == 1:
             # Run a control where the positions are instead randomly determined
-            loc_stem = "random"
+            loc_stem = "random" # randomly shuffled version of the above
         coord_path = (
             DATA_PATH
             + "/models/MBs/RN"
-            + str(base)
+            + base
             + "/"
             + loc_stem
             + ".npz"
         )
-        chosen_save_path = (
-            DATA_PATH + "/models/MBs/RN" + str(base) + "/chosen_indices.npz"
-        )
-        for task in TASKS[model_type]:
-            chosen_indices = np.load(chosen_save_path)[task]
-            print(final_features[task].shape)
-            final_features[task] = final_features[task][:, chosen_indices]
 
         task_idx = np.concatenate(
             [
                 np.repeat(t_idx, final_features[task].shape[1])
-                for t_idx, task in enumerate(TASKS)
+                for t_idx, task in enumerate(task_info)
             ]
         ).ravel()
 
@@ -422,7 +446,7 @@ def main(
         prev_col_ind = col_ind
         new_cost = cost.copy()
 
-        row_ind, col_ind = neighbors_choose_neighbors(
+        row_ind, col_ind = fast_neighbors_choose_neighbors(
             ite,
             new_cost,
             row_ind,
@@ -506,13 +530,13 @@ def main(
 if __name__ == "__main__":
     # Parse command line args
     parser = argparse.ArgumentParser()
-    parser.add_argument("--subj", type=str)
+    parser.add_argument("--subj", type=str, default="01")
     parser.add_argument("--hemi", type=str, default="rh")
     parser.add_argument("--roi", type=str, default="ministreams")
-    parser.add_argument("--model_type", type=str, default="TDANNs")  # TDANNs or MBs
+    parser.add_argument("--model_type", type=str, default="MBs") #"TDANNs")  # 'TDANNs' or 'MBs'
     parser.add_argument(
-        "--base", type=int, default=18
-    )  # base architecture (resnet18 or resnet50)
+        "--base", type=str, default="18",
+    )  # base architecture (resnet18 or resnet50 or resnet50_v2 for 2nd set of functional models)
     parser.add_argument("--spatial_weight", type=float, default=1.25) # (only relevant for TDANNs)
     parser.add_argument(
         "--supervised", type=int, default=0
@@ -522,7 +546,7 @@ if __name__ == "__main__":
     )  # random control (1) or swapopt (0) determined position locations (only relevant for MBs)
     parser.add_argument("--max_iter", type=int, default=100)  # maximum iterations
     parser.add_argument(
-        "--CV", type=int, default=0
+        "--CV", type=int, default=1
     )  # If 1, cross-validate correlations with 515 shared images as test set
     parser.add_argument("--model_seed", type=int, default=0)  # Seed for model
     ARGS, _ = parser.parse_known_args()
