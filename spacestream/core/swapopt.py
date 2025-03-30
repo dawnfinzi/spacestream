@@ -4,6 +4,7 @@ Adapted from https://github.com/neuroailab/TDANN/blob/main/spacetorch/swapopt.py
 import copy
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -260,7 +261,8 @@ class Swapper:
         self.blocked = False
 
     def _load_positions(self):
-        initial_position_path = self.initial_dir / "random_initial_pos.npz"
+        today = date.today().strftime("%d-%m-%Y")
+        initial_position_path = self.initial_dir / f"random_initial_positions-{today}.npz"
         self.initial_positions = np.load(initial_position_path)["coordinates"]
 
     def _load_features(self):

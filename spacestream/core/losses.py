@@ -5,7 +5,7 @@ import numpy as np
 from scipy.spatial.distance import cdist, pdist, squareform
 from scipy.stats import pearsonr
 
-from spacestream.utils.rsm_utils import lower_tri
+from spacestream.utils.array_utils import lower_tri
 from spacestream.utils.swapopt_utils import precompute_neighborhoods
 
 

@@ -1,3 +1,10 @@
+"""
+This script performs swap opt on the candidate features for the functional models.
+
+Example usage:
+    python functional_swap.py --generate_features 1 --data_stem "testing_random_subset_random_positions" --date "01-01-2023" --layer "random_pos" --dataset_name "sine_gratings" --neighborhood_width 4.545454 --base "18"
+"""
+
 import argparse
 from datetime import date
 from pathlib import Path
@@ -12,14 +19,12 @@ from torch.utils.data import DataLoader
 from spacestream.core.feature_extractor import get_features_from_layer
 from spacestream.core.paths import DATA_PATH
 from spacestream.core.swapopt import Swapper
-from spacestream.datasets.sine_gratings import SineResponses, sine_dataloader
-from spacestream.utils.array_utils import flatten
+from spacestream.datasets.sine_gratings import sine_dataloader
 from spacestream.utils.general_utils import load_config_from_yaml
 from spacestream.utils.get_utils import get_model
 
 rng = default_rng()
 
-TASKS = ["categorization", "action", "detection"]
 MODEL_INFO = {
     "18": {
         "layer_name": {
@@ -43,6 +48,7 @@ MODEL_INFO = {
             "detection": False,
         },
         "slowfast_alpha": 8,
+        "tasks": ["categorization", "action", "detection"],
     },
     "50": {
         "layer_name": {
@@ -66,6 +72,31 @@ MODEL_INFO = {
             "detection": False,
         },
         "slowfast_alpha": 4,
+        "tasks": ["categorization", "action", "detection"],
+    },
+    "50_v2": {
+        "layer_name": {
+            "categorization": "features.7.1",
+            "clip": "layer4.1",
+            "detection": "model.backbone.conv_encoder.model.encoder.stages.3.layers.1" ,
+        },
+        "model_name": {
+            "categorization": "convnext_tiny",
+            "clip": "open_clip_rn50", 
+            "detection": "detr_rn50",
+        },
+        "device": {
+            "categorization": "cuda",
+            "clip": "cuda",
+            "detection": "cuda",
+        },
+        "video": {
+            "categorization": False,
+            "clip": False,
+            "detection": False,
+        },
+        "slowfast_alpha": 4,
+        "tasks": ["categorization", "clip", "detection"],
     },
 }
 
@@ -77,7 +108,7 @@ def get_sine_responses(
     layer: str = "layer4.1",
     device: str = "cpu",
     video: bool = False,
-) -> SineResponses:
+):
     model = model.to(device)
     if video:  # can't return inputs and labels, features only
         features = get_features_from_layer(
@@ -87,17 +118,17 @@ def get_sine_responses(
             batch_size=batch_size,
             two_pathway=True,
             reduction_list=[2],
+            vectorize=True,
         )
-        return flatten(features[layer])
     else:
-        features, _, labels = get_features_from_layer(
+        features = get_features_from_layer(
             model,
             dataloader,
             layer,
             batch_size=batch_size,
-            return_inputs_and_labels=True,
+            vectorize=True
         )
-        return SineResponses(features[layer], labels)
+    return features[layer]
 
 
 def save_sine_grating_features_and_positions(base):
@@ -105,9 +136,10 @@ def save_sine_grating_features_and_positions(base):
     num_units_per = 6388
 
     model, final_features, chosen_indices = {}, {}, {}
-    model_info = MODEL_INFO[str(base)]
-    for task in TASKS:
-        model[task] = get_model(model_info["model_name"][task].lower())
+    model_info = MODEL_INFO[base]
+    tasks = model_info["tasks"]
+    for task in tasks:
+        model[task] = get_model(model_info["model_name"][task])
 
         responses = get_sine_responses(
             model[task],
@@ -123,8 +155,8 @@ def save_sine_grating_features_and_positions(base):
             model_info["device"][task],
             model_info["video"][task],
         )
-        if task != "action":
-            responses = responses._data.data
+        # if task != "action":
+        #     responses = responses._data.data
 
         non_zero = np.where(responses.any(axis=0))[
             0
@@ -139,17 +171,13 @@ def save_sine_grating_features_and_positions(base):
     chosen_save_path = Path(
         DATA_PATH
         + "models/MBs/RN"
-        + str(base)
+        + base
         + "/swapopt/chosen_indices-"
         + today
         + ".npz"
     )
-    np.savez(
-        chosen_save_path,
-        categorization=chosen_indices["categorization"],
-        action=chosen_indices["action"],
-        detection=chosen_indices["detection"],
-    )
+    save_data = {task: chosen_indices[task] for task in tasks}
+    np.savez(chosen_save_path, **save_data)
 
     # Assign a subset of positions
     coord_path = DATA_PATH + "models/TDANNs/spacenet_layer4.1_coordinates_isoswap_3.npz"
@@ -163,7 +191,7 @@ def save_sine_grating_features_and_positions(base):
     position_save_path = Path(
         DATA_PATH
         + "models/MBs/RN"
-        + str(base)
+        + base
         + "/swapopt/random_initial_positions"
         + "-"
         + today
@@ -175,7 +203,7 @@ def save_sine_grating_features_and_positions(base):
     feature_path = Path(
         DATA_PATH
         + "models/MBs/RN"
-        + str(base)
+        + base
         + "/swapopt/testing_random_subset_random_positions"
         + "-"
         + today
@@ -218,7 +246,7 @@ def main(
     if date:
         data_stem = data_stem + "-" + date
 
-    stem = DATA_PATH + "models/MBs/RN" + str(base) + "/swapopt/" + data_stem
+    stem = DATA_PATH + "models/MBs/RN" + base + "/swapopt/" + data_stem
     config = load_config_from_yaml(Path(stem + ".yaml"))
     feature_path = Path(stem + ".hdf5")
 
@@ -263,7 +291,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_name", type=str, default="sine_gratings")
     parser.add_argument("--neighborhood_width", type=int, default=4.545454)
     parser.add_argument(
-        "--base", type=int, default=18
+        "--base", type=str, default="50_v2" #"18"
     )  # base architecture (resnet18 or resnet50)
     ARGS, _ = parser.parse_known_args()
 
