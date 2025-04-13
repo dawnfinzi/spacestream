@@ -1,7 +1,7 @@
 """
 Path management
 """
-
+# This corresponds to the following project on OSF: https://osf.io/qy32x/files/osfstorage
 DATA_PATH = "/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/streamlined/data/"
 RESULTS_PATH = (
     "/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/streamlined/results/"

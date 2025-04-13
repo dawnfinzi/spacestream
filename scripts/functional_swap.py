@@ -131,12 +131,16 @@ def get_sine_responses(
     return features[layer]
 
 
-def save_sine_grating_features_and_positions(base):
+def save_sine_grating_features_and_positions(base, vit_control):
     today = date.today().strftime("%d-%m-%Y")
     num_units_per = 6388
 
     model, final_features, chosen_indices = {}, {}, {}
     model_info = MODEL_INFO[base]
+    if vit_control:
+        model_info["layer_name"]["clip"] = "transformer.resblocks.9"
+        model_info["model_name"]["clip"] = "open_clip_vit_b_32"
+
     tasks = model_info["tasks"]
     for task in tasks:
         model[task] = get_model(model_info["model_name"][task])
@@ -155,8 +159,6 @@ def save_sine_grating_features_and_positions(base):
             model_info["device"][task],
             model_info["video"][task],
         )
-        # if task != "action":
-        #     responses = responses._data.data
 
         non_zero = np.where(responses.any(axis=0))[
             0
@@ -172,6 +174,7 @@ def save_sine_grating_features_and_positions(base):
         DATA_PATH
         + "models/MBs/RN"
         + base
+        + ("/vit_control" if vit_control else "")
         + "/swapopt/chosen_indices-"
         + today
         + ".npz"
@@ -192,6 +195,7 @@ def save_sine_grating_features_and_positions(base):
         DATA_PATH
         + "models/MBs/RN"
         + base
+        + ("/vit_control" if vit_control else "")
         + "/swapopt/random_initial_positions"
         + "-"
         + today
@@ -204,6 +208,7 @@ def save_sine_grating_features_and_positions(base):
         DATA_PATH
         + "models/MBs/RN"
         + base
+        + ("/vit_control" if vit_control else "")
         + "/swapopt/testing_random_subset_random_positions"
         + "-"
         + today
@@ -239,14 +244,18 @@ def main(
     dataset_name,
     neighborhood_width,
     base,
+    vit_control,
 ):
+    if vit_control:
+        assert base == "50_v2", "ViT control only applies to base 50_v2"
+
     if generate_features:
-        date = save_sine_grating_features_and_positions(base)
+        date = save_sine_grating_features_and_positions(base, vit_control)
 
     if date:
         data_stem = data_stem + "-" + date
 
-    stem = DATA_PATH + "models/MBs/RN" + base + "/swapopt/" + data_stem
+    stem = DATA_PATH + "models/MBs/RN" + base + ("/vit_control" if vit_control else "") + "/swapopt/" + data_stem
     config = load_config_from_yaml(Path(stem + ".yaml"))
     feature_path = Path(stem + ".hdf5")
 
@@ -293,6 +302,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base", type=str, default="50_v2" #"18"
     )  # base architecture (resnet18 or resnet50)
+    parser.add_argument(
+        "--vit_control", action="store_true"
+    )  
     ARGS, _ = parser.parse_known_args()
 
     main(
@@ -303,4 +315,5 @@ if __name__ == "__main__":
         ARGS.dataset_name,
         ARGS.neighborhood_width,
         ARGS.base,
+        ARGS.vit_control,
     )

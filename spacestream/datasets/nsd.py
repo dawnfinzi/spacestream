@@ -161,7 +161,7 @@ def nsd_dataloader(
                 ),
             ]
         )
-    elif model_name.lower() == "open_clip_rn50":
+    elif model_name.lower() == "open_clip_rn50" or model_name.lower() == "open_clip_vit_b_32": # Same preprocessing for both
         _, _, transform = open_clip.create_model_and_transforms('RN50', pretrained='openai')
     elif model_name.lower() == "convnext_tiny":
         transform = torchvision.models.ConvNeXt_Tiny_Weights.DEFAULT.transforms()

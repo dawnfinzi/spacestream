@@ -65,7 +65,7 @@ def get_ckpts(spatial_weight: float, seed: int, supervised: bool):
     return ckpt_path
 
 
-def get_eval_ckpts(spatial_weight: float, seed: int, supervised: bool, name: str):
+def get_eval_ckpts(spatial_weight: float, seed: int, supervised: bool):
     # this is different than traditional get_ckpts in get_utils because we need the linear eval weights for the simCLR models
 
     sw = SW_PATH_STR_MAPPING[spatial_weight]
@@ -238,6 +238,10 @@ def get_model(
     elif model_name.lower() == "open_clip_rn50":
         # Load OpenCLIP model (RN50 backbone)
         model, _, _ = open_clip.create_model_and_transforms('RN50', pretrained='openai')
+        model = model.visual # vision encoder only
+    elif model_name.lower() == "open_clip_vit_b_32":
+        # Load OpenCLIP model (ViT-B-32 backbone)
+        model, _, _ = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai')
         model = model.visual # vision encoder only
     elif model_name.lower() == "convnext_tiny": # RN50 equivalent
         model = models.convnext_tiny(weights='DEFAULT') # Imagenet1k_V1 weights
