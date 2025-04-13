@@ -168,7 +168,11 @@ def main(
     max_iter,
     CV,
     model_seed,
+    vit_control,
 ):
+    if vit_control:
+        assert base == "50_v2", "ViT control only applies to base 50_v2"
+
     # setup (ugly but backwards compatible)
     if model_type == "TDANNs":
         sub_folder = (
@@ -197,6 +201,7 @@ def main(
         + "mappings/one_to_one/unit2voxel/"
         + model_type
         + sub_folder
+        + ("/vit_control" if vit_control else "")
         + "/subj"
         + subj
         + "/"
@@ -216,12 +221,12 @@ def main(
 
     model_info = MODEL_INFO[model_type][base]
     task_info = model_info["tasks"]
-    if base == "50_v2":
-        nsd_batches = 146
-        imgs_per_batch = 500
-    else:
-        nsd_batches = 73
-        imgs_per_batch = 1000
+    if vit_control:
+        model_info["layer_name"]["clip"] = "transformer.resblocks.9"
+        model_info["model_name"]["clip"] = "open_clip_vit_b_32"
+    
+    nsd_batches = 146
+    imgs_per_batch = 500
 
     model = {}
     for task in task_info:
@@ -236,7 +241,11 @@ def main(
     chosen_indices = {}
     if model_type == "MBs":
         chosen_save_path = (
-            DATA_PATH + "/models/MBs/RN" + base + "/chosen_indices.npz"
+            DATA_PATH 
+            + "/models/MBs/RN" 
+            + base 
+            + ("/vit_control" if vit_control else "")
+            + "/chosen_indices.npz"
         )
         for task in task_info:
             chosen_indices[task] = np.load(chosen_save_path)[task]
@@ -248,7 +257,10 @@ def main(
     prev_batch_end = dict(zip(task_info, [0, 0, 0]))
     for _, task in enumerate(task_info):
         print(task)
-        device = "cuda"
+        if task == "detection" and base == "50":
+            device = "cpu" # issue with faster rcnn and torch version
+        else:
+            device = "cuda"
         for b in range(nsd_batches):
             log(b)
             subj_batch_idx = subj_stim_idx[
@@ -318,15 +330,18 @@ def main(
     streams = mgh_file.get_fdata()[:, 0, 0].astype(int)
     streams_trim = streams[streams != 0]
     # get source betas
-    sorted_betas = get_betas(subj, hemi, streams, chunk_size=100)
+    sorted_betas = get_betas(subj, hemi, streams, chunk_size=50)
     ROI_idx = np.where((streams_trim == 5) | (streams_trim == 6) | (streams_trim == 7))[
         0
     ]
     sorted_betas = sorted_betas[:, ROI_idx]
     # get voxel distance matrix
-    dfile = DATA_PATH + "brains/ministreams_" + hemi + "_distances.mat"
-    with h5py.File(dfile, "r") as f:
-        distances = np.array(f["fullspheredists"])
+    dfile_part1 = DATA_PATH + "brains/ministreams_" + hemi + "_distances_part1.mat"
+    dfile_part2 = DATA_PATH + "brains/ministreams_" + hemi + "_distances_part2.mat"
+    with h5py.File(dfile_part1, "r") as f1, h5py.File(dfile_part2, "r") as f2:
+        distances_part1 = np.array(f1["fullspheredists"])
+        distances_part2 = np.array(f2["fullspheredists"])
+    distances = np.vstack((distances_part1, distances_part2))  # Combine the two parts
     radius_as_percent = RADIUS / np.nanmax(
         distances
     )  # get radius as percent of max distance to do conversion for model distances
@@ -367,11 +382,12 @@ def main(
             loc_stem = "swapopt_swappedon_sine_gratings"
         elif location_type == 1:
             # Run a control where the positions are instead randomly determined
-            loc_stem = "random" # randomly shuffled version of the above
+            loc_stem = "random_initial_positions" # randomly shuffled version of the above
         coord_path = (
             DATA_PATH
             + "/models/MBs/RN"
             + base
+            + ("/vit_control" if vit_control else "")
             + "/"
             + loc_stem
             + ".npz"
@@ -548,6 +564,9 @@ if __name__ == "__main__":
         "--CV", type=int, default=1
     )  # If 1, cross-validate correlations with 515 shared images as test set
     parser.add_argument("--model_seed", type=int, default=0)  # Seed for model
+    parser.add_argument(
+        "--vit_control", action="store_true"
+    )
     ARGS, _ = parser.parse_known_args()
 
     main(
@@ -562,4 +581,5 @@ if __name__ == "__main__":
         ARGS.max_iter,
         ARGS.CV,
         ARGS.model_seed,
+        ARGS.vit_control, 
     )
