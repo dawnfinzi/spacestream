@@ -300,6 +300,8 @@ def get_mapping(
     source_subj="01",  # if voxel2voxel mapping
     roi="ministreams",
     model_type="TDANN",  # options are "TDANN", "MB18", "MB50", and "MB50_v2"
+    vit_control=False,  # if using vit control model
+    random_pos_control=False,  # if using random position control
 ):
     # setup (ugly but backwards compatible)
     if mapping_type == "unit2voxel":
@@ -334,6 +336,7 @@ def get_mapping(
     mapping_path = (
         corr_dir
         + "/"
+        + ("vit_control/" if vit_control else "")
         + (
             (subj_name)
             if mapping_type == "unit2voxel"
@@ -341,7 +344,7 @@ def get_mapping(
         )
         + (
             "/"
-            + ("SWAPOPT_" if "MB" in model_type else "")
+            + ("RANDOM_" if random_pos_control else "SWAPOPT_" if "MB" in model_type else "")
             + hemi
             + "_"
             + roi
