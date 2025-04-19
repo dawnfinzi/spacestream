@@ -30,6 +30,7 @@ def individual_calc(
     corr_type: int = 1,
     seed: int = 0,
     by_stream: int = 0,
+    model_type: str = "TDANNs",
 ):
     # get distance matrix
     dfile = DATA_PATH + "brains/ministreams_" + hemi + "_distances.mat"
@@ -56,15 +57,25 @@ def individual_calc(
         scaled_source_distances = scaled_brain_distances
 
         # load and scale model distances
-        if supervised:
-            coord_path = (
-                DATA_PATH
-                + "models/TDANNs/spacenet_layer4.1_coordinates_supervised_lw0.npz"
-            )
+        if model_type == "TDANNs":
+            if supervised:
+                coord_path = (
+                    DATA_PATH
+                    + "models/TDANNs/spacenet_layer4.1_coordinates_supervised_lw0.npz"
+                )
+            else:
+                coord_path = (
+                    DATA_PATH + "models/TDANNs/spacenet_layer4.1_coordinates_isoswap_3.npz"
+                )
         else:
             coord_path = (
-                DATA_PATH + "models/TDANNs/spacenet_layer4.1_coordinates_isoswap_3.npz"
+                DATA_PATH
+                + "models/MBs/RN"
+                + target
+                + "/swapopt_swappedon_sine_gratings.npz"
             )
+            model_type = "MB" + target
+
         coordinates = np.load(coord_path)["coordinates"]
         model_distances = distance_matrix(coordinates, coordinates, p=2)  # euclidean
         scaled_model_distances = model_distances / (np.max(model_distances))
@@ -85,6 +96,7 @@ def individual_calc(
         weight = target
         subj_name = "subj" + source
 
+    print("Getting mapping for " + model_type)
     mapping = get_mapping(
         subj_name=subj_name,
         mapping_type=combo_type,
@@ -94,6 +106,7 @@ def individual_calc(
         hemi=hemi,
         checkpoint=ckpt_stem,
         source_subj=source,
+        model_type=model_type,
     )
     matched_t, matched_s = prep_smoothness(
         mapping, scaled_target_distances, scaled_source_distances, HVA_idx, by_stream
@@ -117,7 +130,7 @@ def individual_calc(
 
 
 def main(
-    combo_type, checkpoint, num_bins, calc_type, seed, supervised, hemi, by_stream
+    combo_type, checkpoint, num_bins, calc_type, seed, model_type, supervised, hemi, by_stream
 ):
     aggregate = False if calc_type else True
 
@@ -128,15 +141,22 @@ def main(
         target_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
     elif combo_type == "unit2voxel":
-        target_list = [
-            "0.0",
-            "0.1",
-            "0.25",
-            "0.5",
-            "1.25",
-            "2.5",
-            "25.0",
-        ]
+        if model_type == "TDANNs":
+            target_list = [
+                "0.0",
+                "0.1",
+                "0.25",
+                "0.5",
+                "1.25",
+                "2.5",
+                "25.0",
+            ]
+        else:
+            target_list = [
+                "18",
+                "50",
+                "50_v2",
+            ]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
 
     if aggregate:
@@ -148,6 +168,7 @@ def main(
             slen = 7
         elif combo_type == "unit2voxel":
             slen = 8
+
         if by_stream:
             rs = np.zeros((len(target_list), slen, 3))
             ps = np.zeros((len(target_list), slen, 3))
@@ -186,6 +207,7 @@ def main(
                 corr_type=calc_type,
                 seed=seed,
                 by_stream=by_stream,
+                model_type=model_type,
             )
 
             if aggregate:
@@ -254,7 +276,7 @@ def main(
         save_path = (
             RESULTS_PATH
             + "analyses/spatial/"
-            + ("brains" if combo_type == "voxel2voxel" else "TDANNs")
+            + ("brains" if combo_type == "voxel2voxel" else model_type)
             + "/smoothness_calc_"
             + ("lh_" if hemi == "lh" else "")
             + combo_type
@@ -275,7 +297,7 @@ def main(
         save_path = (
             RESULTS_PATH
             + "analyses/spatial/"
-            + ("brains" if combo_type == "voxel2voxel" else "TDANNs")
+            + ("brains" if combo_type == "voxel2voxel" else model_type)
             + "/smoothness_calc_"
             + ("by_stream_" if by_stream else "")
             + ("lh_" if hemi == "lh" else "")
@@ -295,6 +317,9 @@ def main(
             smoothness["p"] = ps
             smoothness["thirddist_p"] = thirddist_ps
 
+    #monkey path because of version issue
+    np.object = object    
+    
     dd.io.save(save_path, smoothness)
 
 
@@ -305,15 +330,16 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str)
     parser.add_argument("--num_bins", type=int, default=100)
     parser.add_argument(
-        "--calc_type", type=int, default=0
+        "--calc_type", type=int, default=2
     )  # 0 is agg_by_dist, 1 is correlation on raw vals, 2 is also correlation but for each individual unit and then avg'ed
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--model_type", type=str, default="MBs") #"TDANNs")  # 'TDANNs' or 'MBs'
     parser.add_argument(
         "--supervised", type=int, default=0
     )  # supervised (1) or simCLR (0) objective
     parser.add_argument("--hemi", type=str, default="rh")
     parser.add_argument(
-        "--by_stream", type=int, default=0
+        "--by_stream", type=int, default=1
     )  # calculate divided up by stream assignment (1) or not (0)
     ARGS, _ = parser.parse_known_args()
 
@@ -323,6 +349,7 @@ if __name__ == "__main__":
         ARGS.num_bins,
         ARGS.calc_type,
         ARGS.seed,
+        ARGS.model_type,
         ARGS.supervised,
         ARGS.hemi,
         ARGS.by_stream,
