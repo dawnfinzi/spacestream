@@ -24,13 +24,10 @@ def individual_calc(
     hemi: str = "rh",
     roi: str = "ministreams",
     checkpoint: str = "final",
-    num_bins: int = 100,
-    supervised: bool = False,
-    aggregate: bool = True,
-    corr_type: int = 1,
+    supervised: int = 0,
     seed: int = 0,
     by_stream: int = 0,
-    model_type: str = "TDANNs",
+    model_type: str = "TDANN",
 ):
     # get distance matrix
     dfile = DATA_PATH + "brains/ministreams_" + hemi + "_distances.mat"
@@ -53,11 +50,13 @@ def individual_calc(
         HVA_idx = np.where(
             (streams_trim == 5) | (streams_trim == 6) | (streams_trim == 7)
         )[0]
+        # dummy spatial weight
+        weight = 0.0
     elif combo_type == "unit2voxel":
         scaled_source_distances = scaled_brain_distances
 
         # load and scale model distances
-        if model_type == "TDANNs":
+        if model_type == "TDANN":
             if supervised:
                 coord_path = (
                     DATA_PATH
@@ -98,50 +97,32 @@ def individual_calc(
 
     print("Getting mapping for " + model_type)
     mapping = get_mapping(
-        subj_name=subj_name,
-        mapping_type=combo_type,
-        spatial_weight=weight,
-        model_seed=seed,
-        supervised=supervised,
-        hemi=hemi,
-        checkpoint=ckpt_stem,
-        source_subj=source,
-        model_type=model_type,
+        subj_name,
+        combo_type,
+        weight,
+        seed,
+        supervised,
+        hemi,
+        ckpt_stem,
+        source,
+        "ministreams",
+        model_type,
     )
     matched_t, matched_s = prep_smoothness(
         mapping, scaled_target_distances, scaled_source_distances, HVA_idx, by_stream
     )
-    if corr_type == 2:
-        return matched_t, matched_s
-    distances = np.ravel(matched_t[:, 1:])
-    del matched_t
-    values = np.ravel(matched_s[:, 1:])
-    del matched_s
-    if aggregate:
-        means, _, bin_edges = agg_by_distance(distances, values, num_bins=num_bins)
-        return means, bin_edges
-    else:  # return all raw distances and values instead
-        if corr_type == 1:
-            # sort distances and values in order of increasing distance
-            dist_sort_ind = np.argsort(distances)
-            sorted_distances = distances[dist_sort_ind]
-            sorted_values = values[dist_sort_ind]
-            return sorted_distances, sorted_values
+    return matched_t, matched_s
 
 
 def main(
-    combo_type, checkpoint, num_bins, calc_type, seed, model_type, supervised, hemi, by_stream
+    combo_type, checkpoint, seed, model_type, supervised, hemi, by_stream
 ):
-    aggregate = False if calc_type else True
-
-    if by_stream:
-        assert calc_type == 2, "combo not implemented yet!"
 
     if combo_type == "voxel2voxel":
         target_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
     elif combo_type == "unit2voxel":
-        if model_type == "TDANNs":
+        if model_type == "TDANN":
             target_list = [
                 "0.0",
                 "0.1",
@@ -159,26 +140,21 @@ def main(
             ]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
 
-    if aggregate:
-        by_target_means = np.zeros((num_bins, len(target_list)))
-        by_target_spread = np.zeros((num_bins, len(target_list)))
-        by_target_bins = np.zeros((num_bins + 1, len(target_list)))
-    else:
-        if combo_type == "voxel2voxel":
-            slen = 7
-        elif combo_type == "unit2voxel":
-            slen = 8
+    if combo_type == "voxel2voxel":
+        slen = 7
+    elif combo_type == "unit2voxel":
+        slen = 8
 
-        if by_stream:
-            rs = np.zeros((len(target_list), slen, 3))
-            ps = np.zeros((len(target_list), slen, 3))
-            thirddist_rs = np.zeros((len(target_list), slen, 3))
-            thirddist_ps = np.zeros((len(target_list), slen, 3))
-        else:
-            rs = np.zeros((len(target_list), slen))
-            ps = np.zeros((len(target_list), slen))
-            thirddist_rs = np.zeros((len(target_list), slen))
-            thirddist_ps = np.zeros((len(target_list), slen))
+    if by_stream:
+        rs = np.zeros((len(target_list), slen, 3))
+        ps = np.zeros((len(target_list), slen, 3))
+        thirddist_rs = np.zeros((len(target_list), slen, 3))
+        thirddist_ps = np.zeros((len(target_list), slen, 3))
+    else:
+        rs = np.zeros((len(target_list), slen))
+        ps = np.zeros((len(target_list), slen))
+        thirddist_rs = np.zeros((len(target_list), slen))
+        thirddist_ps = np.zeros((len(target_list), slen))
 
     for t_sidx, target in enumerate(target_list):
         print(target)
@@ -189,9 +165,6 @@ def main(
         elif combo_type == "unit2voxel":
             source_list = full_source_list
 
-        full_means = np.zeros((num_bins, len(source_list)))
-        full_bin_edges = np.zeros((num_bins + 1, len(source_list)))
-
         for s_sidx, source in enumerate(source_list):
             print(source)
 
@@ -201,121 +174,71 @@ def main(
                 combo_type=combo_type,
                 hemi=hemi,
                 checkpoint=checkpoint,
-                num_bins=num_bins,
-                supervised=(True if supervised else False),
-                aggregate=aggregate,
-                corr_type=calc_type,
+                supervised=supervised,
                 seed=seed,
                 by_stream=by_stream,
                 model_type=model_type,
             )
 
-            if aggregate:
-                full_means[:, s_sidx] = d1
-                full_bin_edges[:, s_sidx] = d2
-            else:
-                if calc_type == 1:
-                    # cutoffs
-                    upto33 = np.where((d1 > 0.33) & (d1 < 0.34))[0][0]
-                    # calc correlations
-                    tr, tp = stats.pearsonr(d1[0:upto33], d2[0:upto33])
-                    r, p = stats.pearsonr(d1, d2)
-                    rs[t_sidx, s_sidx] = r
-                    ps[t_sidx, s_sidx] = p
-                    thirddist_rs[t_sidx, s_sidx] = tr
-                    thirddist_ps[t_sidx, s_sidx] = tp
-                elif calc_type == 2:
-                    if by_stream:
-                        for streamx, stream in enumerate(STREAM_NAMES):
-                            num_units = len(d1[stream])
-                            corrs = np.empty(num_units)
-                            corrs[:] = np.nan
-                            third_corrs = np.empty(num_units)
-                            third_corrs[:] = np.nan
-                            for i in range(num_units):
-                                dists = d1[stream][i, :]
-                                vals = d2[stream][i, :]
-                                poss_idx = np.where((dists > 0.33) & (dists < 0.34))[0]
-                                if len(poss_idx) > 0:
-                                    upto33 = poss_idx[0]
-                                    # calc correlations
-                                    tr, tp = stats.pearsonr(
-                                        dists[0:upto33], vals[0:upto33]
-                                    )
-                                    r, p = stats.pearsonr(dists, vals)
-                                    corrs[i] = r
-                                    third_corrs[i] = tr
-                            rs[t_sidx, s_sidx, streamx] = np.nanmean(corrs)
-                            thirddist_rs[t_sidx, s_sidx, streamx] = np.nanmean(
-                                third_corrs
-                            )
-                    else:
-                        num_units = len(d1)
-                        corrs = np.zeros(num_units)
-                        third_corrs = np.zeros(num_units)
-                        for i in range(num_units):
-                            dists = d1[i, :]
-                            vals = d2[i, :]
-                            upto33 = np.where((dists > 0.33) & (dists < 0.34))[0][0]
+            if by_stream:
+                for streamx, stream in enumerate(STREAM_NAMES):
+                    num_units = len(d1[stream])
+                    corrs = np.empty(num_units)
+                    corrs[:] = np.nan
+                    third_corrs = np.empty(num_units)
+                    third_corrs[:] = np.nan
+                    for i in range(num_units):
+                        dists = d1[stream][i, :]
+                        vals = d2[stream][i, :]
+                        poss_idx = np.where((dists > 0.33) & (dists < 0.34))[0]
+                        if len(poss_idx) > 0:
+                            upto33 = poss_idx[0]
                             # calc correlations
-                            tr, tp = stats.pearsonr(dists[0:upto33], vals[0:upto33])
+                            tr, tp = stats.pearsonr(
+                                dists[0:upto33], vals[0:upto33]
+                            )
                             r, p = stats.pearsonr(dists, vals)
                             corrs[i] = r
                             third_corrs[i] = tr
-                        rs[t_sidx, s_sidx] = np.mean(corrs)
-                        thirddist_rs[t_sidx, s_sidx] = np.mean(third_corrs)
+                    rs[t_sidx, s_sidx, streamx] = np.nanmean(corrs)
+                    thirddist_rs[t_sidx, s_sidx, streamx] = np.nanmean(
+                        third_corrs
+                    )
+                    print(thirddist_rs[t_sidx, s_sidx, streamx])
+            else:
+                num_units = len(d1)
+                corrs = np.zeros(num_units)
+                third_corrs = np.zeros(num_units)
+                for i in range(num_units):
+                    dists = d1[i, :]
+                    vals = d2[i, :]
+                    upto33 = np.where((dists > 0.33) & (dists < 0.34))[0][0]
+                    # calc correlations
+                    tr, tp = stats.pearsonr(dists[0:upto33], vals[0:upto33])
+                    r, p = stats.pearsonr(dists, vals)
+                    corrs[i] = r
+                    third_corrs[i] = tr
+                rs[t_sidx, s_sidx] = np.mean(corrs)
+                thirddist_rs[t_sidx, s_sidx] = np.mean(third_corrs)
 
-        if aggregate:
-            by_target_means[:, t_sidx] = np.mean(full_means, axis=1)
-            by_target_spread[:, t_sidx] = sem(full_means, axis=1)
-            by_target_bins[:, t_sidx] = np.mean(full_bin_edges, axis=1)
-
-            del full_means, full_bin_edges
-
-    if calc_type == 0:
-        save_path = (
-            RESULTS_PATH
-            + "analyses/spatial/"
-            + ("brains" if combo_type == "voxel2voxel" else model_type)
-            + "/smoothness_calc_"
-            + ("lh_" if hemi == "lh" else "")
-            + combo_type
-            + ("_supervised" if supervised else "")
-            + (("_seed" + str(seed)) if seed > 0 else "")
-            + "_means_for_plotting_"
-            + str(num_bins)
-            + "bins_ckpt"
-            + checkpoint
-            + ".hdf"
-        )
-
-        smoothness = {}
-        smoothness["means"] = by_target_means
-        smoothness["spread"] = by_target_spread
-        smoothness["bin_edges"] = by_target_bins
-    else:  # correlations
-        save_path = (
-            RESULTS_PATH
-            + "analyses/spatial/"
-            + ("brains" if combo_type == "voxel2voxel" else model_type)
-            + "/smoothness_calc_"
-            + ("by_stream_" if by_stream else "")
-            + ("lh_" if hemi == "lh" else "")
-            + combo_type
-            + ("_supervised" if supervised else "")
-            + (("_seed" + str(seed)) if seed > 0 else "")
-            + "_correlations_"
-            + ("by_unit_" if calc_type == 2 else "")
-            + "ckpt"
-            + checkpoint
-            + ".hdf"
-        )
-        smoothness = {}
-        smoothness["r"] = rs
-        smoothness["thirddist_r"] = thirddist_rs
-        if calc_type == 1:
-            smoothness["p"] = ps
-            smoothness["thirddist_p"] = thirddist_ps
+    save_path = (
+        RESULTS_PATH
+        + "analyses/spatial/"
+        + ("brains" if combo_type == "voxel2voxel" else model_type)
+        + "/smoothness_calc_"
+        + ("by_stream_" if by_stream else "")
+        + ("lh_" if hemi == "lh" else "")
+        + combo_type
+        + ("_supervised" if supervised else "")
+        + (("_seed" + str(seed)) if seed > 0 else "")
+        + "_correlations_by_unit_" 
+        + "ckpt"
+        + checkpoint
+        + "VAL.hdf"
+    )
+    smoothness = {}
+    smoothness["r"] = rs
+    smoothness["thirddist_r"] = thirddist_rs
 
     #monkey path because of version issue
     np.object = object    
@@ -326,14 +249,10 @@ def main(
 if __name__ == "__main__":
     # Parse command line args
     parser = argparse.ArgumentParser()
-    parser.add_argument("--combo_type", type=str)
-    parser.add_argument("--checkpoint", type=str)
-    parser.add_argument("--num_bins", type=int, default=100)
-    parser.add_argument(
-        "--calc_type", type=int, default=2
-    )  # 0 is agg_by_dist, 1 is correlation on raw vals, 2 is also correlation but for each individual unit and then avg'ed
+    parser.add_argument("--combo_type", type=str, default="unit2voxel")
+    parser.add_argument("--checkpoint", type=str, default="0")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--model_type", type=str, default="MBs") #"TDANNs")  # 'TDANNs' or 'MBs'
+    parser.add_argument("--model_type", type=str, default="TDANN")  # 'TDANN' or 'MB'
     parser.add_argument(
         "--supervised", type=int, default=0
     )  # supervised (1) or simCLR (0) objective
@@ -346,8 +265,6 @@ if __name__ == "__main__":
     main(
         ARGS.combo_type,
         ARGS.checkpoint,
-        ARGS.num_bins,
-        ARGS.calc_type,
         ARGS.seed,
         ARGS.model_type,
         ARGS.supervised,
