@@ -155,9 +155,9 @@ def get_mask_unit_idx(
     return unit_idx
 
 
-def train_imagenet(stream, model_name, spatial_weight, model_seed, subj, hemi):
+def train_imagenet(stream, model_name, spatial_weight, model_seed, subj, hemi, checkpoint):
     # setup
-    name = f"{model_name}_sw{str(spatial_weight)}_{hemi}_subj{subj}_{stream}_seed{str(model_seed)}"
+    name = f"{model_name}_sw{str(spatial_weight)}_{hemi}_subj{subj}_{stream}_seed{str(model_seed)}_{checkpoint}"
     LOG_DIR = f"{RESULTS_PATH}/transfer/linear_eval/logs/{name}"
     SAVE_PATH = (
         f"{RESULTS_PATH}/transfer/linear_eval/checkpoints/{name}_linear_eval.torch"
@@ -231,7 +231,7 @@ def train_imagenet(stream, model_name, spatial_weight, model_seed, subj, hemi):
         unit_idx = None
     else:
         unit_idx = get_mask_unit_idx(
-            stream, spatial_weight, supervised, subj, hemi, model_seed
+            stream, spatial_weight, supervised, subj, hemi, model_seed, checkpoint,
         )
     net_add = MaskMLP(unit_idx)
     model = nn.Sequential(model, net_add)
@@ -366,6 +366,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_seed", type=int, default=0)
     parser.add_argument("--subj", type=str, default="01")
     parser.add_argument("--hemi", type=str, default="rh")
+    parser.add_argument("--checkpoint", type=str, default="final")
 
     ARGS, _ = parser.parse_known_args()
 
@@ -376,4 +377,5 @@ if __name__ == "__main__":
         ARGS.model_seed,
         ARGS.subj,
         ARGS.hemi,
+        ARGS.checkpoint,
     )

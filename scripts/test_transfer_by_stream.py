@@ -82,6 +82,7 @@ def main(
         pca,
         sampling,
         var_splits,
+        checkpoint,
     )
 
     log("All done!")
@@ -109,7 +110,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--pca", type=int, default=1)  # 1 is do_pca, 0 is don't do
     parser.add_argument(
-        "--sampling", type=int, default=0
+        "--sampling", type=int, default=5
     )  # unit sampling type: 0 is all, 1 is top 1k by test_corr values, 2 is top 2k etc
     parser.add_argument(
         "--var_splits", type=int, default=1

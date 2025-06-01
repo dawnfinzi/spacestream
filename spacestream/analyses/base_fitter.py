@@ -112,6 +112,7 @@ class BaseFitter:
         pca=True,
         sampling=0,
         var_splits=0,
+        checkpoint="final",
     ):
         """
         Returns a metrics dict where the keys are the metrics and the values are
@@ -204,6 +205,7 @@ class BaseFitter:
             pca,
             sampling,
             var_splits,
+            checkpoint=checkpoint,
         )
 
     def fit_task(self, task_type, split_data, cls_kwargs=None):
@@ -222,6 +224,7 @@ class BaseFitter:
         pca,
         sampling,
         var_splits,
+        checkpoint="final",
     ):
         sw = "sw" + str(spatial_weight)
 
@@ -236,10 +239,11 @@ class BaseFitter:
         pca_flag = "_no_pca" if not pca else ""
         sampling_flag = f"_top_{str(sampling)}k" if sampling > 0 else ""
         var_splits_flag = "_all_var_splits" if var_splits > 0 else ""
+        checkpoint_flag = f"_{checkpoint}" if checkpoint != "final" else ""
         if stream:
-            context = f"{hemi}_{stream}_stream_{task_type}{pca_flag}{sampling_flag}{var_splits_flag}_save_preds.pkl"
+            context = f"{hemi}_{stream}_stream_{task_type}{pca_flag}{sampling_flag}{var_splits_flag}{checkpoint_flag}_save_preds.pkl"
         else:
-            context = f"{hemi}_all_chosen_units_{task_type}{pca_flag}{sampling_flag}{var_splits_flag}.pkl"
+            context = f"{hemi}_all_chosen_units_{task_type}{pca_flag}{sampling_flag}{var_splits_flag}{checkpoint_flag}.pkl"
         fname = os.path.join(save_dir, context)
         pickle.dump(metrics, open(fname, "wb"))
         print(f"Saved results to {fname}.")

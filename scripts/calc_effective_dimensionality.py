@@ -21,6 +21,7 @@ def main(
     hemi,
     roi,
     layer_name,
+    checkpoint,
 ):
     # all weights, subjects, seeds & streams
     sws = ["0.0", "0.1", "0.25", "0.5", "1.25", "2.5", "25.0"]
@@ -71,22 +72,22 @@ def main(
                 print(features[layer_name].shape)
 
                 # Mapping for stream unit idx
-                mapping_path = Path(
+                mapping_path = (
                     corr_dir
-                    / (
-                        "spatial_weight"
-                        + str(spatial_weight)
-                        + (("_seed" + str(model_seed)) if model_seed > 0 else "")
+                    + "/spatial_weight"
+                    + str(spatial_weight)
+                    + (("_seed" + str(model_seed)) if model_seed > 0 else "")
+                    + "/"
+                    + subj_name
+                    + "/"
+                    + hemi
+                    + "_"
+                    + roi
+                    + "_CV_HVA_only_radius5.0_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_"
+                    + "spherical_target_radius_factor1.0_"
+                    + checkpoint
+                    + "_unit2voxel_correlation_info.hdf5"
                     )
-                    / subj_name
-                    / (
-                        hemi
-                        + "_"
-                        + roi
-                        + "_CV_HVA_only_radius5.0_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_"
-                        + "spherical_target_radius_factor1.0_final_unit2voxel_correlation_info.hdf5"
-                    )
-                )
                 mapping = {}
                 with h5py.File(mapping_path, "r") as f:
                     keys = f.keys()
@@ -114,7 +115,7 @@ def main(
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
 
-        context = f"{model_name}_ED_by_stream_{hemi}.pkl"
+        context = f"{model_name}_ED_by_stream_{hemi}_{checkpoint}.pkl"
         fname = os.path.join(save_dir, context)
         pickle.dump(ED, open(fname, "wb"))
         print(f"Saved results to {fname}.")
@@ -132,6 +133,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--layer_name", type=str, default="base_model.layer4.1"
     )  # model layer
+    parser.add_argument("--checkpoint", type=str, default="final")
 
     ARGS, _ = parser.parse_known_args()
 
@@ -140,4 +142,5 @@ if __name__ == "__main__":
         ARGS.hemi,
         ARGS.roi,
         ARGS.layer_name,
+        ARGS.checkpoint,
     )
