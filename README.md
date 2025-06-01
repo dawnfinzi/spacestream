@@ -1,4 +1,4 @@
-# "A single computational objective drives specialization of streams in visual cortex"
+# "A single computational objective can produce specialization of streams in visual cortex"
 
 ## Authors
 * Dawn Finzi :email:
