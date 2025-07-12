@@ -22,9 +22,9 @@ To install the repository, follow these steps:
 2. Activate the environment: `source spacestream_env/bin/activate`
 3. Clone the repository: `git clone https://github.com/dawnfinzi/spacestream.git`
 4. Change your working directory: `cd spacestream`
-5. Install the required packages: `pip install -e .` This should take less than a minute.
+5. Install the required packages: `pip install -e .` This should take a few minutres at most. 
 
-The code provided in this repository was tested with Python 3.8.9, on an Ubuntu 16.04 workstation with an NVIDIA Titan Xp GPU.
+The code provided in this repository was tested with Python 3.8.20, on an Ubuntu 22.04.5 workstation with an NVIDIA Titan RTX GPU.
 
 ## Where to find relevant data
 The data for this paper comes from the [Natural Scenes Dataset](https://naturalscenesdataset.org/). We use the b3 preparation of the betas, aligned to the fsaverage surface. However, we also z-score the betas prior to analysis (code to do so can be found in `matlab/prepare_betas.m`). As this is a computationally intensive step, we share the (large) processed betas in this Google Drive [link](https://drive.google.com/drive/folders/1kiomjmIVbilqfurAJnV-XIhwrhbR9zIq). 
