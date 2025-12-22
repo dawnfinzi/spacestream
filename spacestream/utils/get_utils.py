@@ -11,7 +11,7 @@ import pandas as pd
 import scipy.io
 import torch
 import torchvision.models as models
-from transformers import DetrForObjectDetection
+from transformers import DetrForObjectDetection, AutoModelForDepthEstimation
 from ssd.config import cfg
 from ssd.modeling.detector import build_detection_model
 from ssd.utils.checkpoint import CheckPointer
@@ -247,6 +247,8 @@ def get_model(
         model = models.convnext_tiny(weights='DEFAULT') # Imagenet1k_V1 weights
     elif model_name.lower() == "detr_rn50": # DETR trained with RN50 backbone
         model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
+    elif model_name.lower() == "depth_anything_v2":
+        model = AutoModelForDepthEstimation.from_pretrained("depth-anything/Depth-Anything-V2-Base-hf")
 
     return model
 

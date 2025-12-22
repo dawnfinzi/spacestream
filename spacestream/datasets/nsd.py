@@ -6,6 +6,7 @@ import open_clip
 import torch
 import torchvision
 from PIL import Image
+from torchvision.transforms import InterpolationMode
 from pytorchvideo.transforms import ShortSideScale, UniformTemporalSubsample
 from torchvision.transforms._transforms_video import (CenterCropVideo,
                                                       NormalizeVideo)
@@ -171,6 +172,16 @@ def nsd_dataloader(
                     torchvision.transforms.ToTensor(),
                     torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Standard for DETR
                 ])
+    elif model_name.lower() in ("depth_anything_v2"):
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.Resize((259,259), interpolation=InterpolationMode.BICUBIC), # divisible by 14
+                torchvision.transforms.ToTensor(),  # scales to [0,1] -> matches rescale_factor 1/255
+                torchvision.transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
     else:
         transform = NSD_TRANSFORMS
 

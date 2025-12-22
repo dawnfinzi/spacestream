@@ -10,6 +10,7 @@ import xarray as xr
 from pytorchvideo.transforms import ShortSideScale, UniformTemporalSubsample
 from skimage import io
 from torch.utils.data import Dataset
+from torchvision.transforms import InterpolationMode
 from torchvision.transforms._transforms_video import (CenterCropVideo,
                                                       NormalizeVideo)
 from typing_extensions import Literal
@@ -324,6 +325,16 @@ def sine_dataloader(
                 torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Standard for DETR
             ])
+    elif model_name.lower() in ("depth_anything_v2"):
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.Resize((259,259), interpolation=InterpolationMode.BICUBIC), # divisible by 14
+                torchvision.transforms.ToTensor(),  # scales to [0,1] -> matches rescale_factor 1/255
+                torchvision.transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
     else:
         transform = DEFAULT_TRANSFORMS
 

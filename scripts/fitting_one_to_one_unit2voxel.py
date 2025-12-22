@@ -71,6 +71,20 @@ MODEL_INFO = {
             "slowfast_alpha": 4,  # placeholder
             "tasks": ["categorization", "clip", "detection"]
         },
+        "50_v3": {
+            "layer_name": {
+                "categorization": "layer4.1",
+                #"action": "blocks.4.multipathway_blocks.0.res_blocks.1",
+                "depth": "backbone.encoder.layer.11",
+            },
+            "model_name": {
+                "categorization": "resnet50",
+                #"action": "slowfast",
+                "depth": "depth_anything_v2",
+            },
+            "slowfast_alpha": 4,
+            "tasks": ["categorization", "action", "depth"]
+        },
     },
     "TDANNs": {
         "self-supervised": {

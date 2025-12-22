@@ -65,8 +65,17 @@ class FeatureExtractor:
 
     def get_activation(self, name):
         def hook(model, input, output):
-            output = output.cpu().numpy()
-            self.layer_batch[name].append(output)
+            # If output is a tuple/list, prefer the first element
+            if isinstance(output, (tuple, list)) and len(output) > 0:
+                out = output[0]
+            # If it's a HF-style output with `last_hidden_state`, use that
+            elif hasattr(output, "last_hidden_state"):
+                out = output.last_hidden_state
+            # fallback: keep original
+            else:
+                out = output
+            out = out.cpu().numpy()
+            self.layer_batch[name].append(out)
 
         return hook
 
