@@ -176,7 +176,17 @@ def nsd_dataloader(
         transform = torchvision.transforms.Compose(
             [
                 torchvision.transforms.Resize((259,259), interpolation=InterpolationMode.BICUBIC), # divisible by 14
-                torchvision.transforms.ToTensor(),  # scales to [0,1] -> matches rescale_factor 1/255
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        )
+    elif model_name.lower() in ("dekr_pose"):
+        transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.Resize((512,512), interpolation=InterpolationMode.BICUBIC), # divisible by 14
+                torchvision.transforms.ToTensor(),
                 torchvision.transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),

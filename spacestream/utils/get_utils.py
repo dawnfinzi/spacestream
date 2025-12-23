@@ -4,6 +4,12 @@ from pathlib import Path
 from typing import List, Union
 from tqdm import tqdm
 
+import sys
+sys.path.append("/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/streamlined/spacestream/external/DEKR/lib")
+#sys.path.append(os.path.join(os.getcwd(), '../../external/DEKR/lib'))
+from config import cfg as dekr_cfg # From DEKR/lib
+from models.hrnet_dekr import get_pose_net # From DEKR/lib/models
+
 import h5py
 import numpy as np
 import open_clip
@@ -249,7 +255,13 @@ def get_model(
         model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
     elif model_name.lower() == "depth_anything_v2":
         model = AutoModelForDepthEstimation.from_pretrained("depth-anything/Depth-Anything-V2-Base-hf")
-
+    elif model_name.lower() == "dekr_pose":
+        config_file = '/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/streamlined/spacestream/external/DEKR/experiments/crowdpose/w32/w32_4x_reg03_bs10_512_adam_lr1e-3_crowdpose_x300.yaml'
+        model_weights = '/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/streamlined/spacestream/external/DEKR/models/pose_crowdpose/pose_dekr_hrnetw32_crowdpose.pth'
+        dekr_cfg.merge_from_file(config_file)
+        model = get_pose_net(dekr_cfg, is_train=False)
+        checkpoint = torch.load(model_weights, map_location='cpu')
+        model.load_state_dict(checkpoint)
     return model
 
 

@@ -74,16 +74,16 @@ MODEL_INFO = {
         "50_v3": {
             "layer_name": {
                 "categorization": "layer4.1",
-                #"action": "blocks.4.multipathway_blocks.0.res_blocks.1",
+                "pose": "stage4.2.relu",
                 "depth": "backbone.encoder.layer.11",
             },
             "model_name": {
                 "categorization": "resnet50",
-                #"action": "slowfast",
+                "pose": "dekr_pose",
                 "depth": "depth_anything_v2",
             },
             "slowfast_alpha": 4,
-            "tasks": ["categorization", "action", "depth"]
+            "tasks": ["categorization", "pose", "depth"]
         },
     },
     "TDANNs": {
@@ -249,7 +249,7 @@ def main(
             pretrained=True,
             spatial_weight=spatial_weight,
             model_seed=model_seed,
-        )
+        ).eval()
 
     # Get indices for subsampling
     chosen_indices = {}

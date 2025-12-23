@@ -98,6 +98,30 @@ MODEL_INFO = {
         "slowfast_alpha": 4,
         "tasks": ["categorization", "clip", "detection"],
     },
+    "50_v3": {
+            "layer_name": {
+                "categorization": "layer4.1",
+                "pose": "stage4.2.relu",
+                "depth": "backbone.encoder.layer.11",
+            },
+            "model_name": {
+                "categorization": "resnet50",
+                "pose": "dekr_pose",
+                "depth": "depth_anything_v2",
+            },
+            "device": {
+                "categorization": "cuda",
+                "pose": "cuda",
+                "depth": "cuda",
+            },
+            "video": {
+                "categorization": False,
+                "pose": False,
+                "depth": False,
+            },
+            "slowfast_alpha": 4,
+            "tasks": ["categorization", "pose", "depth"]
+        },
 }
 
 
@@ -167,7 +191,7 @@ def save_sine_grating_features_and_positions(base, vit_control):
 
         chosen_indices[task] = non_zero[subset]
         final_features[task] = responses[:, chosen_indices[task]]
-    total_feats = np.hstack(final_features.values())
+    total_feats = np.hstack(list(final_features.values()))
     del final_features
 
     chosen_save_path = Path(
@@ -180,6 +204,8 @@ def save_sine_grating_features_and_positions(base, vit_control):
         + ".npz"
     )
     save_data = {task: chosen_indices[task] for task in tasks}
+    # ensure parent directory exists before writing
+    chosen_save_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez(chosen_save_path, **save_data)
 
     # Assign a subset of positions
@@ -201,6 +227,8 @@ def save_sine_grating_features_and_positions(base, vit_control):
         + today
         + ".npz"
     )
+    # ensure parent directory exists before writing
+    position_save_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez(position_save_path, coordinates=positions)
 
     # save out responses to sine gratings just in case
@@ -256,7 +284,28 @@ def main(
         data_stem = data_stem + "-" + date
 
     stem = DATA_PATH + "models/MBs/RN" + base + ("/vit_control" if vit_control else "") + "/swapopt/" + data_stem
-    config = load_config_from_yaml(Path(stem + ".yaml"))
+
+    # If the YAML config doesn't exist, create a minimal one using the current vars
+    yaml_path = Path(stem + ".yaml")
+    if not yaml_path.exists():
+        yaml_path.parent.mkdir(parents=True, exist_ok=True)
+        initial_position_dir = (
+            DATA_PATH
+            + "models/MBs/RN"
+            + base
+            + ("/vit_control" if vit_control else "")
+            + "/swapopt"
+        )
+        yaml_contents = (
+            f"name: {data_stem}\n"
+            + f"initial_position_dir: \"{initial_position_dir}\"\n"
+            + "swapopt:\n"
+            + "  num_steps: 50000000\n"
+            + "  steps_per_neighborhood: 500\n"
+        )
+        yaml_path.write_text(yaml_contents)
+
+    config = load_config_from_yaml(yaml_path)
     feature_path = Path(stem + ".hdf5")
 
     swapper = Swapper(
@@ -298,7 +347,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--layer", type=str, default="random_pos")
     parser.add_argument("--dataset_name", type=str, default="sine_gratings")
-    parser.add_argument("--neighborhood_width", type=int, default=4.545454)
+    parser.add_argument("--neighborhood_width", type=float, default=4.545454)
     parser.add_argument(
         "--base", type=str, default="50_v2" #"18"
     )  # base architecture (resnet18 or resnet50)

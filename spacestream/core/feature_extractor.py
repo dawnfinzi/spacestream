@@ -166,10 +166,8 @@ class FeatureExtractor:
                     hook.remove()
 
                 for k, v in self.layer_batch.items():
-                    # if time_step is not None:
-                    #    v = np.expand_dims(v[time_step], axis = 0)
                     if time_step is None:
-                        v = np.squeeze(v, axis=0)
+                        v = v[0]
                     else:
                         v = v[time_step]
                     self.layer_results[k].append(v)
