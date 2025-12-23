@@ -3,12 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Union
 from tqdm import tqdm
-
 import sys
-sys.path.append("/oak/stanford/groups/kalanit/biac2/kgs/projects/Dawn/streamlined/spacestream/external/DEKR/lib")
-#sys.path.append(os.path.join(os.getcwd(), '../../external/DEKR/lib'))
-from config import cfg as dekr_cfg # From DEKR/lib
-from models.hrnet_dekr import get_pose_net # From DEKR/lib/models
 
 import h5py
 import numpy as np
@@ -27,9 +22,13 @@ from spacestream.core.constants import (MATCHING_SLOWFAST_LAYERS, N_REPEATS,
                                         RESNET101_LAYERS, SLOWFAST_LAYERS,
                                         SPACETORCH_LAYERS, SW_PATH_STR_MAPPING,
                                         X3D_LAYERS)
-from spacestream.core.paths import BETA_PATH, DATA_PATH, RESULTS_PATH
+from spacestream.core.paths import path_stem, BETA_PATH, DATA_PATH, RESULTS_PATH
 from spacestream.models.spatial_resnet import SpatialResNet18
 from spacestream.utils.slowfast_utils import load_slowfast_model
+
+sys.path.append(os.path.join(path_stem, 'spacestream/external/DEKR/lib'))
+from config import cfg as dekr_cfg # From DEKR/lib
+from models.hrnet_dekr import get_pose_net # From DEKR/lib/models
 
 # set up logger
 logging.basicConfig(
