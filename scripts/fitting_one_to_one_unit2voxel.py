@@ -18,6 +18,7 @@ from scipy.spatial import distance_matrix
 from spacestream.core.constants import SW_PATH_STR_MAPPING
 from spacestream.core.feature_extractor import get_features_from_layer
 from spacestream.core.paths import DATA_PATH, RESULTS_PATH
+from spacestream.datasets.sine_gratings import sine_dataloader
 from spacestream.datasets.nsd import nsd_dataloader
 from spacestream.utils.general_utils import fast_pearson, log
 from spacestream.utils.get_utils import get_betas, get_indices, get_model
@@ -99,10 +100,96 @@ MODEL_INFO = {
             "slowfast_alpha": 4,  # placeholder
             "tasks": ["none"],
         },
+        "self-supervised_v1": { 
+            "layer_name": {"none": "base_model.layer2.0"},
+            "model_name": {"none": "spacetorch"},
+            "slowfast_alpha": 4,  # placeholder
+            "tasks": ["none"],
+        },
     },
 }
 RADIUS = 5.0  # radius (in mm) for local neighborhood
 DISTANCE_CUTOFF = 2.0  # cutoff for mahalanobis neighbor distances
+
+
+def get_tdann_v1_chosen_indices(
+    spatial_weight,
+    model_seed,
+    supervised,
+    batch_size=32,
+):
+    """Select a responding-unit subset for TDANN v1 control.
+
+    The TDANN v1 control layer (layer2.0) has many more units than the voxel
+    count, so we subsample to the layer4.1 count for fair comparison. For MB
+    models this is handled in functional_swap as part of swapopt (chosen_indices
+    are computed there). TDANNs already performed swapopt during training, so
+    we only need to select responding units here.
+    """
+    layer4_coords = np.load(
+        DATA_PATH + "models/TDANNs/spacenet_layer4.1_coordinates_isoswap_3.npz"
+    )["coordinates"]
+    target_units = layer4_coords.shape[0]
+
+    v1_coords_path = (
+        DATA_PATH + "models/TDANNs/spacenet_layer2.0_coordinates_isoswap_3.npz"
+    )
+    v1_coords = np.load(v1_coords_path)["coordinates"]
+    if target_units > v1_coords.shape[0]:
+        raise ValueError(
+            "layer2.0 has fewer units than layer4.1: "
+            f"{target_units} > {v1_coords.shape[0]}"
+        )
+
+    chosen_save_path = (
+        DATA_PATH + "models/TDANNs/spacenet_layer2.0_chosen_indices.npz"
+    )
+    if Path(chosen_save_path).exists():
+        return np.load(chosen_save_path)["none"]
+
+    model_name = "spacetorch_supervised" if supervised else "spacetorch"
+    model = get_model(
+        model_name,
+        pretrained=True,
+        spatial_weight=spatial_weight,
+        model_seed=model_seed,
+    ).eval()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+
+    dataloader = sine_dataloader(
+        None,
+        False,  # video
+        batch_size,
+        model_name,
+        4,  # slowfast_alpha not used for TDANNs
+    )
+    features = get_features_from_layer(
+        model,
+        dataloader,
+        "base_model.layer2.0",
+        batch_size=batch_size,
+        vectorize=True,
+        device=device,
+    )
+    responses = features["base_model.layer2.0"]
+    non_zero = np.where(responses.any(axis=0))[0]
+    if non_zero.shape[0] < target_units:
+        raise ValueError(
+            "Not enough responding units to match layer4.1: "
+            f"{non_zero.shape[0]} < {target_units}"
+        )
+
+    v1_rng = default_rng(model_seed) if model_seed > 0 else default_rng()
+    chosen_indices = v1_rng.choice(
+        non_zero.shape[0],
+        size=target_units,
+        replace=False,
+    )
+    chosen_indices = non_zero[chosen_indices]
+    Path(chosen_save_path).parent.mkdir(parents=True, exist_ok=True)
+    np.savez(chosen_save_path, none=chosen_indices)
+    return chosen_indices
 
 
 def write_checkpoint(
@@ -183,6 +270,7 @@ def main(
     CV,
     model_seed,
     vit_control,
+    v1_control,
 ):
     if vit_control:
         assert base == "50_v2", "ViT control only applies to base 50_v2"
@@ -190,9 +278,7 @@ def main(
     # setup (ugly but backwards compatible)
     if model_type == "TDANNs":
         sub_folder = (
-            "/supervised"
-            if supervised
-            else "/self-supervised"
+            ("/supervised" if supervised else "/self-supervised")
             + "/spatial_weight"
             + str(spatial_weight)
             + ("_seed" + str(model_seed) if model_seed > 0 else "")
@@ -206,6 +292,8 @@ def main(
         base = (
             "supervised" if supervised else "self-supervised"
         )  # reassign to match MB structure
+        if v1_control: # override base to earlier layer control
+            base = "self-supervised_v1"
     else:
         sub_folder = "/RN" + base
         suffix = "matched_random_subsample_max_iters" + str(max_iter)
@@ -215,6 +303,7 @@ def main(
         + "mappings/one_to_one/unit2voxel/"
         + model_type
         + sub_folder
+        + ("/v1_control" if v1_control else "")
         + ("/vit_control" if vit_control else "")
         + "/subj"
         + subj
@@ -263,6 +352,12 @@ def main(
         )
         for task in task_info:
             chosen_indices[task] = np.load(chosen_save_path)[task]
+    elif model_type == "TDANNs" and v1_control:
+        chosen_indices["none"] = get_tdann_v1_chosen_indices(
+            spatial_weight=spatial_weight,
+            model_seed=model_seed,
+            supervised=supervised,
+        )
    
     # Get model features
     log("Getting features")
@@ -310,7 +405,7 @@ def main(
             del batch
 
             if b == 0:
-                if model_type == "MBs":
+                if task in chosen_indices:
                     feat_length = len(chosen_indices[task])
                 else:
                     feat_length = batch_feats[model_info["layer_name"][task]].shape[
@@ -322,7 +417,7 @@ def main(
                     (subj_stim_idx.shape[0], feat_length), dtype=np.float32
                 )
 
-            if model_type == "TDANNS":
+            if task not in chosen_indices:
                 chosen_indices[task] = np.arange(feat_length)
             final_features[task][
                 prev_batch_end[task] : prev_batch_end[task] + batch_end, :
@@ -389,6 +484,10 @@ def main(
             coord_path = (
                 DATA_PATH + "models/TDANNs/spacenet_layer4.1_coordinates_isoswap_3.npz"
             )
+            if v1_control:
+                coord_path = (
+                    DATA_PATH + "models/TDANNs/spacenet_layer2.0_coordinates_isoswap_3.npz"
+                )
         task_idx = None
     else:
         if location_type == 0:
@@ -419,8 +518,11 @@ def main(
     log(str(total_feats.shape[1]))
 
     coordinates = np.load(coord_path)["coordinates"]
-    model_distances = distance_matrix(coordinates, coordinates, p=2)  # euclidean
-    model_radius = radius_as_percent * np.max(model_distances)
+    if max_iter > 0:
+        model_distances = distance_matrix(coordinates, coordinates, p=2)  # euclidean
+        model_radius = radius_as_percent * np.max(model_distances)
+    else: # Skip when no neighborhood refinement since this is mem heavy
+        model_radius = None
 
     # sort into train and test sets if CV'ed
     if CV:
@@ -461,7 +563,7 @@ def main(
     )
 
     # build dict to store starting unit assignments
-    unit_keys = range(0, len(model_distances))
+    unit_keys = range(0, coordinates.shape[0])
     prev_assignments = dict(zip(unit_keys, [None] * len(unit_keys)))
     for r in range(len(row_ind)):
         prev_assignments[row_ind[r]] = col_ind[r]
@@ -562,7 +664,7 @@ if __name__ == "__main__":
     parser.add_argument("--subj", type=str, default="01")
     parser.add_argument("--hemi", type=str, default="rh")
     parser.add_argument("--roi", type=str, default="ministreams")
-    parser.add_argument("--model_type", type=str, default="MBs") #"TDANNs")  # 'TDANNs' or 'MBs'
+    parser.add_argument("--model_type", type=str, default="TDANNs")  # 'TDANNs' or 'MBs'
     parser.add_argument(
         "--base", type=str, default="18",
     )  # base architecture (resnet18 or resnet50 or resnet50_v2 for 2nd set of functional models)
@@ -573,13 +675,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--location_type", type=int, default=0
     )  # random control (1) or swapopt (0) determined position locations (only relevant for MBs)
-    parser.add_argument("--max_iter", type=int, default=100)  # maximum iterations
+    parser.add_argument("--max_iter", type=int, default=0)  # maximum iterations. 0 for no neighborhood alg refinement.
     parser.add_argument(
         "--CV", type=int, default=1
     )  # If 1, cross-validate correlations with 515 shared images as test set
     parser.add_argument("--model_seed", type=int, default=0)  # Seed for model
     parser.add_argument(
         "--vit_control", action="store_true"
+    )
+    parser.add_argument(
+        "--v1_control", action="store_true" # Control TDANN with earlier layer
     )
     ARGS, _ = parser.parse_known_args()
 
@@ -596,4 +701,5 @@ if __name__ == "__main__":
         ARGS.CV,
         ARGS.model_seed,
         ARGS.vit_control, 
+        ARGS.v1_control,
     )

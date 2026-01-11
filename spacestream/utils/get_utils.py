@@ -332,7 +332,7 @@ def get_mapping(
                 "supervised" if supervised else "self-supervised"
             )  # reassign to match MB structure
         else:
-            sub_folder = "/RN" + ("18" if "18" in model_type else "50_v2" if "50_v2" in model_type else "50")
+            sub_folder = "/RN" + ("18" if "18" in model_type else "50_v2" if "50_v2" in model_type else "50_v3" if "50_v3" in model_type else "50")
             model_type = "MB"
             mapping_stem = "_CV_HVA_only_matched_random_subsample_max_iters100"
 

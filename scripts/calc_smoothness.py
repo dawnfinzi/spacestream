@@ -137,6 +137,7 @@ def main(
                 "18",
                 "50",
                 "50_v2",
+                "50_v3",
             ]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
 
@@ -224,7 +225,7 @@ def main(
     save_path = (
         RESULTS_PATH
         + "analyses/spatial/"
-        + ("brains" if combo_type == "voxel2voxel" else model_type)
+        + ("brains" if combo_type == "voxel2voxel" else model_type + "s")
         + "/smoothness_calc_"
         + ("by_stream_" if by_stream else "")
         + ("lh_" if hemi == "lh" else "")
@@ -234,7 +235,7 @@ def main(
         + "_correlations_by_unit_" 
         + "ckpt"
         + checkpoint
-        + "VAL.hdf"
+        + "_1231.hdf"
     )
     smoothness = {}
     smoothness["r"] = rs
