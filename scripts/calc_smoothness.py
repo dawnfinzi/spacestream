@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 import deepdish as dd
 import h5py
@@ -28,6 +29,7 @@ def individual_calc(
     seed: int = 0,
     by_stream: int = 0,
     model_type: str = "TDANN",
+    v1_control: int = 0,
 ):
     # get distance matrix
     dfile = DATA_PATH + "brains/ministreams_" + hemi + "_distances.mat"
@@ -66,6 +68,10 @@ def individual_calc(
                 coord_path = (
                     DATA_PATH + "models/TDANNs/spacenet_layer4.1_coordinates_isoswap_3.npz"
                 )
+            if v1_control:
+                coord_path = (
+                    DATA_PATH + "models/TDANNs/spacenet_layer2.0_coordinates_isoswap_3.npz"
+                )
         else:
             coord_path = (
                 DATA_PATH
@@ -76,6 +82,17 @@ def individual_calc(
             model_type = "MB" + target
 
         coordinates = np.load(coord_path)["coordinates"]
+        if model_type == "TDANN" and v1_control:
+            chosen_save_path = (
+                DATA_PATH + "models/TDANNs/spacenet_layer2.0_chosen_indices.npz"
+            )
+            if not Path(chosen_save_path).exists():
+                raise FileNotFoundError(
+                    "Missing TDANN v1 chosen indices file: "
+                    + chosen_save_path
+                )
+            chosen_indices = np.load(chosen_save_path)["none"]
+            coordinates = coordinates[chosen_indices]
         model_distances = distance_matrix(coordinates, coordinates, p=2)  # euclidean
         scaled_model_distances = model_distances / (np.max(model_distances))
         del coordinates, model_distances
@@ -107,6 +124,7 @@ def individual_calc(
         source,
         "ministreams",
         model_type,
+        v1_control=v1_control,
     )
     matched_t, matched_s = prep_smoothness(
         mapping, scaled_target_distances, scaled_source_distances, HVA_idx, by_stream
@@ -115,7 +133,7 @@ def individual_calc(
 
 
 def main(
-    combo_type, checkpoint, seed, model_type, supervised, hemi, by_stream
+    combo_type, checkpoint, seed, model_type, supervised, hemi, by_stream, v1_control
 ):
 
     if combo_type == "voxel2voxel":
@@ -140,6 +158,12 @@ def main(
                 "50_v3",
             ]
         full_source_list = ["01", "02", "03", "04", "05", "06", "07", "08"]
+    if v1_control:
+        assert combo_type == "unit2voxel", "v1 control only applies to unit2voxel combo type"
+        assert model_type == "TDANN", "v1 control only applies to TDANN model type"
+        target_list = [ # best spatial weight only
+                "0.25",
+            ]
 
     if combo_type == "voxel2voxel":
         slen = 7
@@ -179,6 +203,7 @@ def main(
                 seed=seed,
                 by_stream=by_stream,
                 model_type=model_type,
+                v1_control=v1_control,
             )
 
             if by_stream:
@@ -227,6 +252,7 @@ def main(
         + "analyses/spatial/"
         + ("brains" if combo_type == "voxel2voxel" else model_type + "s")
         + "/smoothness_calc_"
+        + ("v1_control_" if v1_control else "")
         + ("by_stream_" if by_stream else "")
         + ("lh_" if hemi == "lh" else "")
         + combo_type
@@ -235,7 +261,7 @@ def main(
         + "_correlations_by_unit_" 
         + "ckpt"
         + checkpoint
-        + "_1231.hdf"
+        + ".hdf"
     )
     smoothness = {}
     smoothness["r"] = rs
@@ -261,6 +287,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--by_stream", type=int, default=1
     )  # calculate divided up by stream assignment (1) or not (0)
+    parser.add_argument(
+        "--v1_control", type=int, default=0
+    )  # control using "v1-equivalent" TDANN layer
     ARGS, _ = parser.parse_known_args()
 
     main(
@@ -271,4 +300,5 @@ if __name__ == "__main__":
         ARGS.supervised,
         ARGS.hemi,
         ARGS.by_stream,
+        ARGS.v1_control,
     )

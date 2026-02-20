@@ -22,7 +22,7 @@ from spacestream.core.constants import (MATCHING_SLOWFAST_LAYERS, N_REPEATS,
                                         RESNET101_LAYERS, SLOWFAST_LAYERS,
                                         SPACETORCH_LAYERS, SW_PATH_STR_MAPPING,
                                         X3D_LAYERS)
-from spacestream.core.paths import path_stem, BETA_PATH, DATA_PATH, RESULTS_PATH
+from spacestream.core.paths import path_stem, BETA_PATH, DATA_PATH, RESULTS_PATH, STIM_PATH
 from spacestream.models.spatial_resnet import SpatialResNet18
 from spacestream.utils.slowfast_utils import load_slowfast_model
 
@@ -111,7 +111,7 @@ def get_eval_ckpts(spatial_weight: float, seed: int, supervised: bool):
     return ckpt_path
 
 
-def get_indices(subj: str, shared: bool = False):
+def get_indices(subj: str, shared: bool = False, return_rep_vals: bool = False):
     order = scipy.io.loadmat(BETA_PATH + "datab3nativesurface_subj" + subj)
     data = pd.read_csv(
         DATA_PATH + "brains/ppdata/subj" + subj + "/behav/responses.tsv", sep="\t"
@@ -146,7 +146,30 @@ def get_indices(subj: str, shared: bool = False):
         sharedix = expdesign["sharedix"][0]
     validation_mask = np.isin(rep_vals, sharedix)
 
+    if return_rep_vals:
+        return beta_order, beta_mask, validation_mask, rep_vals
     return beta_order, beta_mask, validation_mask
+
+
+def get_stimulus_indices(subset: str, subj: str = "01"):
+    if subset == "full":
+        stim_path = STIM_PATH + "nsd_stimuli.hdf5"
+        with h5py.File(stim_path, "r") as f:
+            n_items = f["imgBrick"].shape[0]
+        return np.arange(n_items, dtype=np.int64)
+
+    if subset == "shared_1000":
+        with h5py.File(DATA_PATH + "brains/shared_73Kids.h5", "r") as f:
+            return np.array(f["shared_1000"], dtype=np.int64) - 1
+
+    if subset == "shared_515":
+        _, _, validation_mask, rep_vals = get_indices(
+            subj=subj, shared=True, return_rep_vals=True
+        )
+        # Convert from 1-based 73K IDs to 0-based indexing.
+        return rep_vals[validation_mask].astype(np.int64) - 1
+
+    raise ValueError(f"Unknown subset: {subset}")
 
 def get_betas(subj, hemi, roi_info, chunk_size=1000):
     """
@@ -315,6 +338,7 @@ def get_mapping(
     model_type="TDANN",  # options are "TDANN", "MB18", "MB50", and "MB50_v2"
     vit_control=False,  # if using vit control model
     random_pos_control=False,  # if using random position control
+    v1_control=False,  # if using "v1-equivalent" TDANN layer as control
 ):
     # setup (ugly but backwards compatible)
     if mapping_type == "unit2voxel":
@@ -327,7 +351,12 @@ def get_mapping(
                 + str(spatial_weight)
                 + ("_seed" + str(model_seed) if model_seed > 0 else "")
             )
-            mapping_stem = "_CV_HVA_only_radius5.0_max_iters100_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
+            tdann_max_iters = 0 if v1_control else 100
+            mapping_stem = (
+                "_CV_HVA_only_radius5.0_max_iters"
+                + str(tdann_max_iters)
+                + "_constant_radius_2.0dist_cutoff_constant_dist_cutoff_spherical_target_radius_factor1.0"
+            )
             stem = (
                 "supervised" if supervised else "self-supervised"
             )  # reassign to match MB structure
@@ -349,6 +378,7 @@ def get_mapping(
     mapping_path = (
         corr_dir
         + "/"
+        + ("v1_control/" if v1_control else "")
         + ("vit_control/" if vit_control else "")
         + (
             (subj_name)
