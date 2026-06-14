@@ -24,7 +24,6 @@ from spacestream.utils.metric_utils import (
 def parse_layers(layer_names, all_layers):
     if all_layers:
         return [
-            #"base_model.conv1",
             "base_model.maxpool",
             "base_model.layer1.0",
             "base_model.layer1.1",
@@ -34,7 +33,6 @@ def parse_layers(layer_names, all_layers):
             "base_model.layer3.1",
             "base_model.layer4.0",
             "base_model.layer4.1",
-            "base_model.avgpool",
         ]
     return [name.strip() for name in layer_names.split(",") if name.strip()]
 
