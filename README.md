@@ -9,6 +9,8 @@
 
 *co-senior authors
 
+[![DOI](https://zenodo.org/badge/726973393.svg)](https://doi.org/10.5281/zenodo.20753396)
+
 ## Overview of the repository
 This repository has the following components:
 * `notebooks/`: Jupyter notebooks that reproduce all the statistics in the paper and the relevant figures.
@@ -34,3 +36,4 @@ Additional processing steps created intermediate outputs. For example, running `
 The easiest way to use the data is to create a local folder `$YOUR_FOLDER` where you clone this repo and install the repo as specified above. We then recommend creating data/ and results/ subfolders and downloading the file structure as is from the OSF project into your data subfolder. If using the processed betas, those should be downloaded into `$YOUR_FOLDER/data/brains/organized_betas`. You should then be able to run the scripts included in this repo just by updating the path_stem in `spacestream/core/paths.py` to `$YOUR_FOLDER`.
 
 Note that this repository includes the code to run the iterative one-to-one mapping algorithm with a smoothness constraint introduced in [Topographic DCNNs trained on a single self-supervised task capture the functional organization of cortex into visual processing streams](https://openreview.net/forum?id=E1iY-d13smd) from SVHRM @ NeurIPS 2022. However, "A single computational objective can produce specialization of streams in visual cortex" no longer uses this algorithm and instead reports results from only the simpler initial one-to-one mapping based purely on functional correlations. This mapping is saved as "checkpoint0" from `fitting_one_to_one_unit2voxel.py` and `fitting_one_to_one_voxel2voxel.py`, which is still capable of running the iterative neighborhood algorithm as mentioned, if `--max_iter` is set to > 0. 
+
