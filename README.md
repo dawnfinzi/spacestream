@@ -7,7 +7,7 @@
 * Daniel L. K. Yamins*
 * Kalanit Grill-Spector*
 
-*co-senior authors
+*These authors jointly supervised this work.
 
 [![DOI](https://zenodo.org/badge/726973393.svg)](https://doi.org/10.5281/zenodo.20753396)
 
